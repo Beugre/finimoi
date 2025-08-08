@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retour de paiement - FinIMoi</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="icon" type="image/png" href="assets/images/favicon.png">
+    <style>
+        .status-container {
+            text-align: center;
+            padding: 40px 20px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .status-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .warning { color: #ffc107; }
+        .processing { color: #007bff; }
+        .countdown {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+        .debug-info {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: left;
+            font-family: monospace;
+            font-size: 12px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="status-container">
+            <div class="logo">
+                <img src="assets/images/logo.png" alt="FinIMoi" height="60">
+            </div>
+            
+            <div id="status-display">
+                <div class="status-icon processing">⏳</div>
+                <h1>Vérification du paiement...</h1>
+                <p>Analyse du statut de votre transaction en cours...</p>
+            </div>
+
+            <div id="countdown-display" style="display: none;">
+                <div class="countdown" id="countdown">5</div>
+                <p>Redirection automatique vers l'application...</p>
+            </div>
+
+            <div class="debug-info" id="debug-info">
+                <strong>📊 Informations de debug :</strong><br>
+                <span id="debug-content">Chargement...</span>
+            </div>
+
+            <div style="margin-top: 30px;">
+                <a href="finimoi://" class="btn btn-primary" id="manual-return">
+                    🔗 Ouvrir l'application manuellement
+                </a>
+                <br><br>
+                <a href="https://finimoi.com" class="btn btn-secondary">
+                    🏠 Retour au site web
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        console.log('🔄 Page de retour de paiement FinIMoi chargée');
+        
+        // Récupérer tous les paramètres URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const transactionId = urlParams.get('transaction_id');
+        const amount = urlParams.get('amount');
+        const status = urlParams.get('status');
+        
+        // Paramètres CinetPay potentiels
+        const cpmResult = urlParams.get('cpm_result');
+        const cpmTransId = urlParams.get('cpm_trans_id');
+        const cpmAmount = urlParams.get('cpm_amount');
+        const cpmCurrency = urlParams.get('cpm_currency');
+        
+        console.log('📊 Paramètres détectés:', {
+            transactionId,
+            amount,
+            status,
+            cpmResult,
+            cpmTransId,
+            cpmAmount,
+            cpmCurrency,
+            fullUrl: window.location.href,
+            allParams: Object.fromEntries(urlParams.entries())
+        });
+
+        // Afficher les informations de debug
+        document.getElementById('debug-content').innerHTML = `
+            URL complète: ${window.location.href}<br>
+            Transaction ID: ${transactionId || 'Non fourni'}<br>
+            Status: ${status || 'Non fourni'}<br>
+            CinetPay Result: ${cpmResult || 'Non fourni'}<br>
+            CinetPay Trans ID: ${cpmTransId || 'Non fourni'}<br>
+            Montant: ${amount || cpmAmount || 'Non fourni'}<br>
+            Devise: ${cpmCurrency || 'Non fournie'}<br>
+            Timestamp: ${new Date().toISOString()}
+        `;
+
+        // Déterminer le vrai statut du paiement
+        function determinePaymentStatus() {
+            // CinetPay ne passe malheureusement pas le statut dans l'URL de retour
+            // Il faut toujours vérifier via l'API dans l'app
+            
+            if (transactionId && transactionId.startsWith('FINIMOI_')) {
+                return 'pending'; // Nécessite vérification API obligatoire
+            }
+            
+            return 'unknown';
+        }
+
+        const paymentStatus = determinePaymentStatus();
+        console.log('💳 Statut déterminé:', paymentStatus);
+
+        // Afficher le statut approprié
+        function displayStatus(status) {
+            const statusDisplay = document.getElementById('status-display');
+            
+            switch(status) {
+                case 'success':
+                    statusDisplay.innerHTML = `
+                        <div class="status-icon success">✅</div>
+                        <h1 class="success">Paiement réussi !</h1>
+                        <p>Votre rechargement a été effectué avec succès.</p>
+                    `;
+                    break;
+                    
+                case 'failed':
+                    statusDisplay.innerHTML = `
+                        <div class="status-icon error">❌</div>
+                        <h1 class="error">Paiement échoué</h1>
+                        <p>Votre paiement n'a pas pu être traité. Veuillez réessayer.</p>
+                    `;
+                    break;
+                    
+                case 'pending':
+                    statusDisplay.innerHTML = `
+                        <div class="status-icon warning">⏳</div>
+                        <h1 class="warning">Vérification en cours</h1>
+                        <p>Votre paiement est en cours de vérification. L'application va vérifier le statut auprès de CinetPay...</p>
+                    `;
+                    break;
+                    
+                default:
+                    statusDisplay.innerHTML = `
+                        <div class="status-icon warning">❓</div>
+                        <h1 class="warning">Statut inconnu</h1>
+                        <p>Impossible de déterminer le statut. Vérification dans l'application...</p>
+                    `;
+            }
+        }
+
+        displayStatus(paymentStatus);
+
+        // Préparer le deep link avec tous les paramètres disponibles
+        function buildDeepLink() {
+            let deepLinkUrl = 'finimoi://payment/return?';
+            const params = new URLSearchParams();
+            
+            // Ajouter tous les paramètres disponibles
+            if (transactionId) params.append('transaction_id', transactionId);
+            if (cpmTransId && !transactionId) params.append('transaction_id', cpmTransId);
+            if (status) params.append('status', status);
+            if (cpmResult) params.append('cpm_result', cpmResult);
+            if (amount) params.append('amount', amount);
+            if (cpmAmount && !amount) params.append('amount', cpmAmount);
+            if (cpmCurrency) params.append('currency', cpmCurrency);
+            
+            deepLinkUrl += params.toString();
+            
+            console.log('🚀 Deep link construit:', deepLinkUrl);
+            return deepLinkUrl;
+        }
+
+        // Lancer la redirection automatique après 2 secondes (plus rapide)
+        setTimeout(() => {
+            console.log('🔗 Lancement de la redirection automatique...');
+            
+            const deepLinkUrl = buildDeepLink();
+            
+            // Afficher le compte à rebours
+            document.getElementById('countdown-display').style.display = 'block';
+            
+            let countdown = 3; // Réduit à 3 secondes
+            const countdownElement = document.getElementById('countdown');
+            const countdownInterval = setInterval(() => {
+                countdown--;
+                countdownElement.textContent = countdown;
+                
+                if (countdown <= 0) {
+                    clearInterval(countdownInterval);
+                    
+                    try {
+                        window.location.href = deepLinkUrl;
+                        console.log('📱 Deep link exécuté');
+                    } catch (error) {
+                        console.error('❌ Erreur lors du deep link:', error);
+                    }
+                }
+            }, 1000);
+            
+        }, 2000); // Réduit à 2 secondes
+
+        // Lien manuel
+        document.getElementById('manual-return').addEventListener('click', (e) => {
+            e.preventDefault();
+            const deepLinkUrl = buildDeepLink();
+            console.log('🔗 Lien manuel cliqué:', deepLinkUrl);
+            window.location.href = deepLinkUrl;
+        });
+
+        // Detecter si l'utilisateur revient (app non installée)
+        let hidden = false;
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                hidden = true;
+                console.log('📱 Page masquée - app potentiellement ouverte');
+            } else if (hidden) {
+                console.log('🔄 Utilisateur revenu - app probablement non installée');
+                setTimeout(() => {
+                    if (!document.hidden) {
+                        alert('L\'application FinIMoi ne semble pas être installée. Téléchargez-la depuis le site web.');
+                    }
+                }, 1000);
+            }
+        });
+    </script>
+</body>
+</html>

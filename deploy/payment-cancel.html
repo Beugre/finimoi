@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paiement Annulé - FinIMoi</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="assets/images/favicon.png">
+    <link rel="apple-touch-icon" href="assets/images/apple-touch-icon.png">
+</head>
+<body>
+    <div class="payment-page payment-cancel">
+        <div class="payment-card">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-bottom: 1rem;">
+                <img src="assets/images/logo.svg" alt="FinIMoi" style="height: 32px; width: auto;">
+                <span style="font-weight: 700; color: var(--primary-color);">FinIMoi</span>
+            </div>
+            <div class="payment-icon">
+                <i class="fas fa-times"></i>
+            </div>
+            <h2>Paiement Annulé</h2>
+            <p>Votre paiement a été annulé. Aucun montant n'a été débité de votre compte. Vous allez être redirigé vers l'application FinIMoi.</p>
+            
+            <div class="countdown" id="countdown">5</div>
+            <p><small>Redirection automatique dans <span id="timer">5</span> secondes...</small></p>
+            
+            <div style="margin-top: 2rem;">
+                <a href="finimoi://payment/return?status=cancelled" class="btn btn-primary">
+                    <i class="fas fa-mobile-alt"></i>
+                    Retourner à l'App
+                </a>
+            </div>
+            
+            <div style="margin-top: 1rem;">
+                <a href="https://finimoi.com" style="color: var(--text-light); text-decoration: none;">
+                    <i class="fas fa-globe"></i>
+                    Visiter finimoi.com
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Redirection automatique vers l'app
+        let countdown = 5;
+        const countdownElement = document.getElementById('countdown');
+        const timerElement = document.getElementById('timer');
+        
+        const timer = setInterval(() => {
+            countdown--;
+            countdownElement.textContent = countdown;
+            timerElement.textContent = countdown;
+            
+            if (countdown <= 0) {
+                clearInterval(timer);
+                // Essayer d'ouvrir l'app via le deep link
+                window.location.href = 'finimoi://payment/return?status=cancelled';
+                
+                // Fallback après 2 secondes si l'app ne s'ouvre pas
+                setTimeout(() => {
+                    window.location.href = 'https://finimoi.com';
+                }, 2000);
+            }
+        }, 1000);
+        
+        // Detecter si l'utilisateur revient sur la page (app non installée)
+        let hidden = false;
+        
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                hidden = true;
+            } else if (hidden) {
+                // L'utilisateur est revenu, probablement parce que l'app n'est pas installée
+                clearInterval(timer);
+                document.querySelector('.payment-card').innerHTML = `
+                    <div class="payment-icon">
+                        <i class="fas fa-download"></i>
+                    </div>
+                    <h2>Application Non Installée</h2>
+                    <p>Il semble que vous n'ayez pas encore installé l'application FinIMoi.</p>
+                    <div style="margin-top: 2rem;">
+                        <a href="https://finimoi.com#download" class="btn btn-primary">
+                            <i class="fas fa-download"></i>
+                            Télécharger FinIMoi
+                        </a>
+                    </div>
+                `;
+            }
+        };
+        
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        
+        // Gestion des paramètres URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const transactionId = urlParams.get('transaction_id');
+        const reason = urlParams.get('reason');
+        
+        if (transactionId) {
+            console.log('Transaction ID:', transactionId);
+        }
+        
+        if (reason) {
+            console.log('Cancellation reason:', reason);
+        }
+    </script>
+</body>
+</html>

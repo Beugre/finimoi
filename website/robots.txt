@@ -1,0 +1,19 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://finimoi.com/sitemap.xml
+
+# Priorités de crawl
+Crawl-delay: 1
+
+# Fichiers autorisés spécifiquement
+Allow: /assets/css/
+Allow: /assets/js/
+Allow: /assets/images/
+Allow: /payment-success.html
+Allow: /payment-cancel.html
+
+# Désindexer les fichiers techniques
+Disallow: /.htaccess
+Disallow: /README.md

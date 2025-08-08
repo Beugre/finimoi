@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paiement Réussi - FinIMoi</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="assets/images/favicon.png">
+    <link rel="apple-touch-icon" href="assets/images/apple-touch-icon.png">
+</head>
+<body>
+    <div class="payment-page payment-success">
+        <div class="payment-card">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-bottom: 1rem;">
+                <img src="assets/images/logo.svg" alt="FinIMoi" style="height: 32px; width: auto;">
+                <span style="font-weight: 700; color: var(--primary-color);">FinIMoi</span>
+            </div>
+            <div class="payment-icon">
+                <i class="fas fa-check"></i>
+            </div>
+            <h2>Paiement Réussi !</h2>
+            <p>Votre recharge a été effectuée avec succès. Vous allez être redirigé vers l'application FinIMoi.</p>
+            
+            <div class="countdown" id="countdown">5</div>
+            <p><small>Redirection automatique dans <span id="timer">5</span> secondes...</small></p>
+            
+            <div style="margin-top: 2rem;">
+                <a href="finimoi://payment/return?status=success" class="btn btn-primary">
+                    <i class="fas fa-mobile-alt"></i>
+                    Retourner à l'App
+                </a>
+            </div>
+            
+            <div style="margin-top: 1rem;">
+                <a href="https://finimoi.com" style="color: var(--text-light); text-decoration: none;">
+                    <i class="fas fa-globe"></i>
+                    Visiter finimoi.com
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Redirection automatique vers l'app
+        let countdown = 5;
+        const countdownElement = document.getElementById('countdown');
+        const timerElement = document.getElementById('timer');
+        
+        const timer = setInterval(() => {
+            countdown--;
+            countdownElement.textContent = countdown;
+            timerElement.textContent = countdown;
+            
+            if (countdown <= 0) {
+                clearInterval(timer);
+                // Essayer d'ouvrir l'app via le deep link
+                console.log('🔗 Tentative d\'ouverture de l\'app via deep link...');
+                
+                // Récupérer les paramètres URL pour debug
+                const urlParams = new URLSearchParams(window.location.search);
+                const transactionId = urlParams.get('transaction_id');
+                const amount = urlParams.get('amount');
+                const status = urlParams.get('status') || 'success';
+                
+                console.log('📊 Paramètres de transaction:', { transactionId, amount, status });
+                
+                // Créer l'URL de deep link avec les paramètres obligatoires
+                let deepLinkUrl = `finimoi://payment/return?status=${status}`;
+                
+                // Ajouter transaction_id si disponible (critique pour la mise à jour du solde)
+                if (transactionId && transactionId.trim() !== '') {
+                    deepLinkUrl += `&transaction_id=${encodeURIComponent(transactionId)}`;
+                    console.log('✅ Transaction ID ajouté au deep link');
+                } else {
+                    console.warn('⚠️ Aucun transaction_id trouvé - la mise à jour du solde pourrait échouer');
+                }
+                
+                // Ajouter le montant si disponible
+                if (amount) {
+                    deepLinkUrl += `&amount=${encodeURIComponent(amount)}`;
+                }
+                
+                console.log('🚀 Deep link URL final:', deepLinkUrl);
+                
+                // Essayer d'ouvrir l'app
+                try {
+                    window.location.href = deepLinkUrl;
+                    console.log('📱 Tentative d\'ouverture de l\'app...');
+                } catch (error) {
+                    console.error('❌ Erreur lors de l\'ouverture du deep link:', error);
+                }
+                
+                // Fallback après 3 secondes si l'app ne s'ouvre pas
+                setTimeout(() => {
+                    console.log('⚠️ App non ouverte après 3 secondes, redirection vers le site web');
+                    // window.location.href = 'https://finimoi.com';
+                }, 3000);
+            }
+        }, 1000);
+        
+        // Detecter si l'utilisateur revient sur la page (app non installée)
+        let hidden = false;
+        
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                hidden = true;
+                console.log('📱 Page masquée - app potentiellement ouverte');
+            } else if (hidden) {
+                // L'utilisateur est revenu, probablement parce que l'app n'est pas installée
+                console.log('🔄 Utilisateur revenu sur la page - app probablement non installée');
+                clearInterval(timer);
+                document.querySelector('.payment-card').innerHTML = `
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-bottom: 1rem;">
+                        <img src="assets/images/logo.svg" alt="FinIMoi" style="height: 32px; width: auto;">
+                        <span style="font-weight: 700; color: var(--primary-color);">FinIMoi</span>
+                    </div>
+                    <div class="payment-icon">
+                        <i class="fas fa-download"></i>
+                    </div>
+                    <h2>Application Non Installée</h2>
+                    <p>Il semble que vous n'ayez pas encore installé l'application FinIMoi.</p>
+                    <div style="margin-top: 2rem;">
+                        <a href="https://finimoi.com#download" class="btn btn-primary">
+                            <i class="fas fa-download"></i>
+                            Télécharger FinIMoi
+                        </a>
+                    </div>
+                `;
+            }
+        };
+        
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        
+        // Debug: Afficher les paramètres URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const transactionId = urlParams.get('transaction_id');
+        const amount = urlParams.get('amount');
+        
+        if (transactionId) {
+            console.log('✅ Transaction ID détecté:', transactionId);
+            // Optionnel: Afficher les détails de la transaction
+        }
+        
+        if (amount) {
+            console.log('💰 Montant détecté:', amount);
+        }
+        
+        // Debug: Tester la disponibilité de l'app
+        function testAppAvailability() {
+            const testUrl = 'finimoi://test';
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = testUrl;
+            document.body.appendChild(iframe);
+            
+            setTimeout(() => {
+                document.body.removeChild(iframe);
+            }, 1000);
+        }
+        
+        // Tester après 1 seconde
+        setTimeout(testAppAvailability, 1000);
+        
+        // Log de démarrage
+        console.log('🚀 Page de succès FinIMoi chargée');
+        console.log('🔗 URL actuelle:', window.location.href);
+    </script>
+</body>
+</html>

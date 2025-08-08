@@ -1,0 +1,45 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "finimoi",
+          "appId": "1:363043806234:android:08d871ad9f3a8c2b2f85a3",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "finimoi",
+          "appId": "1:363043806234:ios:55ffc18e7c14d6eb2f85a3",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "macos": {
+        "default": {
+          "projectId": "finimoi",
+          "appId": "1:363043806234:ios:55ffc18e7c14d6eb2f85a3",
+          "uploadDebugSymbols": false,
+          "fileOutput": "macos/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "finimoi",
+          "configurations": {
+            "android": "1:363043806234:android:08d871ad9f3a8c2b2f85a3",
+            "ios": "1:363043806234:ios:55ffc18e7c14d6eb2f85a3",
+            "macos": "1:363043806234:ios:55ffc18e7c14d6eb2f85a3",
+            "web": "1:363043806234:web:d69892032496ce192f85a3",
+            "windows": "1:363043806234:web:6cf47618c3b7e0e12f85a3"
+          }
+        }
+      }
+    }
+  }
+}

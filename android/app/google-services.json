@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "363043806234",
+    "project_id": "finimoi",
+    "storage_bucket": "finimoi.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:363043806234:android:08d871ad9f3a8c2b2f85a3",
+        "android_client_info": {
+          "package_name": "com.finimoi.app.finimoi"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA9nsz1gvlVXyjmvYtPJRTKJR-BzhTdurE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
