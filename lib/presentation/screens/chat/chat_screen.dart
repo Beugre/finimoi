@@ -37,8 +37,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   border: InputBorder.none,
                 ),
                 autofocus: true,
-                onSubmitted: (value) {
-                  // TODO: Implement search
+                onChanged: (value) {
+                  setState(() {}); // Rebuild the list on search query change
                 },
               )
             : const Text('Messages'),
@@ -146,11 +146,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Widget _buildChatList(List<Chat> chats) {
+    final filteredChats = chats.where((chat) {
+      final query = _searchController.text.toLowerCase();
+      if (query.isEmpty) return true;
+
+      final chatName = _getChatDisplayName(chat, ref.read(userProfileProvider).value!.id).toLowerCase();
+      return chatName.contains(query);
+    }).toList();
+
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: chats.length,
+      itemCount: filteredChats.length,
       itemBuilder: (context, index) {
-        final chat = chats[index];
+        final chat = filteredChats[index];
         return _buildChatTile(chat);
       },
     );
@@ -438,21 +446,83 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _showContactPicker() {
-    // TODO: Implement contact picker
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Sélection de contact à implémenter'),
-        backgroundColor: Color(0xFF6B46C1),
-      ),
+    showDialog(
+      context: context,
+      builder: (context) {
+        return FutureBuilder<List<UserModel>>(
+          future: UserService.getAllUsers(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return AlertDialog(
+                title: const Text('Erreur'),
+                content: Text('Impossible de charger les contacts: ${snapshot.error}'),
+                actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
+              );
+            }
+            final users = snapshot.data ?? [];
+            return AlertDialog(
+              title: const Text('Choisir un contact'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: users.length,
+                  itemBuilder: (context, index) {
+                    final user = users[index];
+                    return ListTile(
+                      title: Text(user.fullName),
+                      onTap: () async {
+                        final currentUserId = ref.read(userProfileProvider).value!.id;
+                        final chatId = await ref.read(chatServiceProvider).getOrCreateDirectChat(currentUserId, user.id);
+                        Navigator.pop(context);
+                        context.push('/chat/$chatId');
+                      },
+                    );
+                  },
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
   void _showGroupCreation() {
-    // TODO: Implement group creation
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Création de groupe à implémenter'),
-        backgroundColor: Color(0xFF6B46C1),
+    final groupNameController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Nouveau groupe'),
+        content: TextField(
+          controller: groupNameController,
+          decoration: const InputDecoration(hintText: 'Nom du groupe'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final groupName = groupNameController.text;
+              if (groupName.isNotEmpty) {
+                final currentUserId = ref.read(userProfileProvider).value!.id;
+                final chatId = await ref.read(chatServiceProvider).createGroupChat(
+                      groupName: groupName,
+                      memberIds: [currentUserId], // Start with just the creator
+                      createdBy: currentUserId,
+                    );
+                Navigator.pop(context);
+                context.push('/chat/$chatId');
+              }
+            },
+            child: const Text('Créer'),
+          ),
+        ],
       ),
     );
   }

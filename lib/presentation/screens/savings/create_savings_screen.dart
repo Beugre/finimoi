@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../data/providers/auth_provider.dart';
+import '../../../data/services/real_savings_service.dart';
+import '../../../domain/entities/savings_model.dart';
 
 class CreateSavingsScreen extends ConsumerStatefulWidget {
   const CreateSavingsScreen({super.key});
@@ -189,7 +192,7 @@ class _CreateSavingsScreenState extends ConsumerState<CreateSavingsScreen> {
   Future<void> _createSavingsGoal() async {
     if (!_formKey.currentState!.validate() || _deadline == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Veuillez remplir tous les champs'),
           backgroundColor: AppColors.error,
         ),
@@ -199,13 +202,35 @@ class _CreateSavingsScreenState extends ConsumerState<CreateSavingsScreen> {
 
     setState(() => _isLoading = true);
 
+    final userId = ref.read(authProvider).currentUser?.uid;
+    if (userId == null) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Veuillez vous connecter.')),
+      );
+      return;
+    }
+
     try {
-      // TODO: Implement savings goal creation logic
-      await Future.delayed(Duration(seconds: 2)); // Simulation
+      final newGoal = SavingsModel(
+        id: '',
+        userId: userId,
+        goalName: _goalNameController.text,
+        targetAmount: double.parse(_targetAmountController.text),
+        monthlyContribution: double.parse(_monthlyAmountController.text),
+        deadline: _deadline!,
+        isLocked: _isLocked,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        currentAmount: 0,
+        isCompleted: false,
+      );
+
+      await ref.read(realSavingsServiceProvider).createSavings(newGoal);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text('Objectif d\'épargne créé !'),
             backgroundColor: AppColors.success,
           ),

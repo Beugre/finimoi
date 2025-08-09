@@ -360,6 +360,37 @@ class _TontineDetailScreenState extends ConsumerState<TontineDetailScreen>
           // Prochaines échéances
           if (tontine.status == TontineStatus.active) ...[
             _buildInfoSection(
+              title: 'Mes Préférences',
+              children: [
+                SwitchListTile(
+                  title: const Text('Paiement automatique'),
+                  subtitle: const Text(
+                      'Activer pour payer automatiquement vos contributions'),
+                  value: tontine.members
+                          .firstWhere(
+                              (m) => m.userId == ref.watch(currentUserProvider)?.uid,
+                              orElse: () => TontineMember(
+                                  userId: '',
+                                  name: '',
+                                  joinedAt: DateTime.now(),
+                                  isActive: false,
+                                  position: 0))
+                          .autoPayEnabled,
+                  onChanged: (value) {
+                    final userId = ref.read(currentUserProvider)?.uid;
+                    if (userId != null) {
+                      ref.read(tontineServiceProvider).updateAutoPayStatus(
+                            tontine.id,
+                            userId,
+                            value,
+                          );
+                    }
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 32),
+            _buildInfoSection(
               title: 'Prochaines échéances',
               children: [
                 Container(

@@ -11,6 +11,14 @@ final userServiceProvider = Provider<UserService>((ref) {
   return UserService();
 });
 
+final juniorAccountsProvider = StreamProvider<List<UserModel>>((ref) {
+  final parentId = ref.watch(currentUserProvider)?.uid;
+  if (parentId == null) {
+    return Stream.value([]);
+  }
+  return ref.watch(userServiceProvider).getJuniorAccounts(parentId);
+});
+
 final transferServiceProvider = Provider<TransferService>((ref) {
   return TransferService();
 });

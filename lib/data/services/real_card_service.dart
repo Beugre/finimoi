@@ -12,25 +12,34 @@ class RealCardService {
       return Stream.value([]);
     }
 
-    return _firestore
+    final ownedCardsStream = _firestore
         .collection('cards')
         .where('userId', isEqualTo: currentUser.uid)
-        .where('isActive', isEqualTo: true)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
-          return snapshot.docs
-              .map((doc) {
-                try {
-                  return CardModel.fromFirestore(doc);
-                } catch (e) {
-                  print('Erreur lors du parsing de la carte ${doc.id}: $e');
-                  return null;
-                }
-              })
-              .whereType<CardModel>()
-              .toList();
-        });
+        .snapshots();
+
+    final sharedCardsStream = _firestore
+        .collection('cards')
+        .where('sharedWith', arrayContains: currentUser.uid)
+        .snapshots();
+
+    // Combine the two streams
+    return ownedCardsStream.asyncMap((ownedSnapshot) async {
+      final sharedSnapshot = await sharedCardsStream.first;
+      final allDocs = [...ownedSnapshot.docs, ...sharedSnapshot.docs];
+      final uniqueDocs = { for (var doc in allDocs) doc.id : doc }.values.toList();
+
+      final cards = uniqueDocs.map((doc) {
+        try {
+          return CardModel.fromFirestore(doc);
+        } catch (e) {
+          print('Erreur lors du parsing de la carte ${doc.id}: $e');
+          return null;
+        }
+      }).whereType<CardModel>().toList();
+
+      cards.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return cards;
+    });
   }
 
   // Créer une nouvelle carte
@@ -100,6 +109,28 @@ class RealCardService {
               .map((doc) => {'id': doc.id, ...doc.data()})
               .toList();
         });
+  }
+
+  // Partager une carte
+  static Future<void> shareCard(String cardId, String friendId) async {
+    try {
+      await _firestore.collection('cards').doc(cardId).update({
+        'sharedWith': FieldValue.arrayUnion([friendId]),
+      });
+    } catch (e) {
+      throw Exception('Erreur lors du partage de la carte: $e');
+    }
+  }
+
+  // Ne plus partager une carte
+  static Future<void> unshareCard(String cardId, String friendId) async {
+    try {
+      await _firestore.collection('cards').doc(cardId).update({
+        'sharedWith': FieldValue.arrayRemove([friendId]),
+      });
+    } catch (e) {
+      throw Exception('Erreur lors de l\'annulation du partage: $e');
+    }
   }
 
   // Fonctions privées pour générer les données de carte

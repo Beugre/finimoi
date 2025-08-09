@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'gamification_service.dart';
 
 class AuthService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -19,6 +20,7 @@ class AuthService {
     required String email,
     required String password,
     required String fullName,
+    String? referralCode,
   }) async {
     try {
       final UserCredential result = await _auth.createUserWithEmailAndPassword(
@@ -40,7 +42,16 @@ class AuthService {
           email: email,
           firstName: firstName,
           lastName: lastName,
+          referredBy: referralCode,
         );
+
+        // Assign a referral code to the new user
+        await GamificationService().assignReferralCode(result.user!.uid);
+
+        // Handle the referral if a code was provided
+        if (referralCode != null && referralCode.isNotEmpty) {
+          await GamificationService().handleReferral(result.user!.uid, referralCode);
+        }
       }
 
       return result;
@@ -279,6 +290,7 @@ class AuthService {
     required String email,
     required String firstName,
     required String lastName,
+    String? referredBy,
   }) async {
     try {
       final finimoimTag = await _generateUniqueFinIMoiTag(firstName, lastName);
@@ -300,6 +312,7 @@ class AuthService {
         'finimoimtag': finimoimTag,
         'currency': 'XOF', // Devise par défaut
         'country': 'CI', // Pays par défaut (Côte d'Ivoire)
+        'referredBy': referredBy,
       });
     } catch (e) {
       print('Erreur lors de la création du profil: $e');

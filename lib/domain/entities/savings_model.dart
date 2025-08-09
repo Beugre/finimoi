@@ -3,92 +3,82 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class SavingsModel {
   final String id;
   final String userId;
-  final String title;
+  final String goalName;
   final String description;
   final double targetAmount;
   final double currentAmount;
-  final DateTime targetDate;
-  final bool isActive;
+  final double monthlyContribution;
+  final DateTime deadline;
+  final bool isLocked;
   final bool isCompleted;
+  final double interestRate;
   final bool autoSave;
   final double autoSaveAmount;
   final DateTime createdAt;
   final DateTime updatedAt;
-  final DateTime? lastContributionAt;
-  final DateTime? lastWithdrawalAt;
-  final Map<String, dynamic>? metadata;
+  final String? approverId;
 
   SavingsModel({
     required this.id,
     required this.userId,
-    required this.title,
+    required this.goalName,
     required this.description,
     required this.targetAmount,
     required this.currentAmount,
-    required this.targetDate,
-    required this.isActive,
+    required this.monthlyContribution,
+    required this.deadline,
+    required this.isLocked,
     required this.isCompleted,
-    required this.autoSave,
-    required this.autoSaveAmount,
+    required this.interestRate,
+    this.autoSave = false,
+    this.autoSaveAmount = 0.0,
     required this.createdAt,
     required this.updatedAt,
-    this.lastContributionAt,
-    this.lastWithdrawalAt,
-    this.metadata,
+    this.approverId,
   });
 
-  // Factory constructor depuis Firestore
   factory SavingsModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
-
     return SavingsModel(
       id: doc.id,
       userId: data['userId'] ?? '',
-      title: data['title'] ?? '',
+      goalName: data['goalName'] ?? '',
       description: data['description'] ?? '',
       targetAmount: (data['targetAmount'] ?? 0.0).toDouble(),
       currentAmount: (data['currentAmount'] ?? 0.0).toDouble(),
-      targetDate:
-          (data['targetDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      isActive: data['isActive'] ?? true,
+      monthlyContribution: (data['monthlyContribution'] ?? 0.0).toDouble(),
+      deadline: (data['deadline'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      isLocked: data['isLocked'] ?? false,
       isCompleted: data['isCompleted'] ?? false,
+      interestRate: (data['interestRate'] ?? 0.0).toDouble(),
       autoSave: data['autoSave'] ?? false,
       autoSaveAmount: (data['autoSaveAmount'] ?? 0.0).toDouble(),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      lastContributionAt: (data['lastContributionAt'] as Timestamp?)?.toDate(),
-      lastWithdrawalAt: (data['lastWithdrawalAt'] as Timestamp?)?.toDate(),
-      metadata: data['metadata'] as Map<String, dynamic>?,
+      approverId: data['approverId'],
     );
   }
 
-  // Conversion vers Map pour Firestore
   Map<String, dynamic> toFirestore() {
     return {
-      'id': id,
       'userId': userId,
-      'title': title,
+      'goalName': goalName,
       'description': description,
       'targetAmount': targetAmount,
       'currentAmount': currentAmount,
-      'targetDate': Timestamp.fromDate(targetDate),
-      'isActive': isActive,
+      'monthlyContribution': monthlyContribution,
+      'deadline': Timestamp.fromDate(deadline),
+      'isLocked': isLocked,
       'isCompleted': isCompleted,
+      'interestRate': interestRate,
       'autoSave': autoSave,
       'autoSaveAmount': autoSaveAmount,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
-      'lastContributionAt': lastContributionAt != null
-          ? Timestamp.fromDate(lastContributionAt!)
-          : null,
-      'lastWithdrawalAt': lastWithdrawalAt != null
-          ? Timestamp.fromDate(lastWithdrawalAt!)
-          : null,
-      'metadata': metadata,
+      'approverId': approverId,
     };
   }
 
-  // Getters utiles
   double get progressPercentage =>
       targetAmount > 0 ? (currentAmount / targetAmount) * 100 : 0.0;
 
@@ -97,59 +87,58 @@ class SavingsModel {
 
   int get daysRemaining {
     final now = DateTime.now();
-    return targetDate.isAfter(now) ? targetDate.difference(now).inDays : 0;
+    return deadline.isAfter(now) ? deadline.difference(now).inDays : 0;
   }
 
-  bool get isOverdue => DateTime.now().isAfter(targetDate) && !isCompleted;
+  bool get isOverdue => DateTime.now().isAfter(deadline) && !isCompleted;
 
   String get statusText {
     if (isCompleted) return 'Objectif atteint';
     if (isOverdue) return 'En retard';
-    if (!isActive) return 'Suspendu';
+    if (isLocked && deadline.isAfter(DateTime.now())) return 'Bloqué';
     return 'En cours';
   }
 
-  // Méthode copyWith pour créer une copie avec modifications
   SavingsModel copyWith({
     String? id,
     String? userId,
-    String? title,
+    String? goalName,
     String? description,
     double? targetAmount,
     double? currentAmount,
-    DateTime? targetDate,
-    bool? isActive,
+    double? monthlyContribution,
+    DateTime? deadline,
+    bool? isLocked,
     bool? isCompleted,
+    double? interestRate,
     bool? autoSave,
     double? autoSaveAmount,
     DateTime? createdAt,
     DateTime? updatedAt,
-    DateTime? lastContributionAt,
-    DateTime? lastWithdrawalAt,
-    Map<String, dynamic>? metadata,
+    String? approverId,
   }) {
     return SavingsModel(
       id: id ?? this.id,
       userId: userId ?? this.userId,
-      title: title ?? this.title,
+      goalName: goalName ?? this.goalName,
       description: description ?? this.description,
       targetAmount: targetAmount ?? this.targetAmount,
       currentAmount: currentAmount ?? this.currentAmount,
-      targetDate: targetDate ?? this.targetDate,
-      isActive: isActive ?? this.isActive,
+      monthlyContribution: monthlyContribution ?? this.monthlyContribution,
+      deadline: deadline ?? this.deadline,
+      isLocked: isLocked ?? this.isLocked,
       isCompleted: isCompleted ?? this.isCompleted,
+      interestRate: interestRate ?? this.interestRate,
       autoSave: autoSave ?? this.autoSave,
       autoSaveAmount: autoSaveAmount ?? this.autoSaveAmount,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
-      lastContributionAt: lastContributionAt ?? this.lastContributionAt,
-      lastWithdrawalAt: lastWithdrawalAt ?? this.lastWithdrawalAt,
-      metadata: metadata ?? this.metadata,
+      approverId: approverId ?? this.approverId,
     );
   }
 
   @override
   String toString() {
-    return 'SavingsModel(id: $id, title: $title, targetAmount: $targetAmount, currentAmount: $currentAmount, progressPercentage: ${progressPercentage.toStringAsFixed(1)}%)';
+    return 'SavingsModel(id: $id, goalName: $goalName, targetAmount: $targetAmount, currentAmount: $currentAmount, progressPercentage: ${progressPercentage.toStringAsFixed(1)}%)';
   }
 }

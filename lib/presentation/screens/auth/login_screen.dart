@@ -1,3 +1,4 @@
+import 'package:finimoi/data/services/biometric_auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -27,10 +28,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   bool _isPasswordVisible = false;
   bool _rememberMe = false;
   bool _isLoading = false;
+  bool _isBiometricAvailable = false;
 
   @override
   void initState() {
     super.initState();
+    _checkBiometricAvailability();
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 1000),
       vsync: this,
@@ -46,6 +49,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           ),
         );
     _animationController.forward();
+  }
+
+  Future<void> _checkBiometricAvailability() async {
+    final isAvailable = await ref.read(biometricAuthServiceProvider).isBiometricAvailable();
+    if (mounted) {
+      setState(() {
+        _isBiometricAvailable = isAvailable;
+      });
+    }
+  }
+
+  void _authenticateWithBiometrics() async {
+    final biometricService = ref.read(biometricAuthServiceProvider);
+    final isAuthenticated = await biometricService.authenticate('Veuillez vous authentifier pour continuer');
+
+    if (isAuthenticated && mounted) {
+      // Here you would typically fetch a stored token and log the user in.
+      // For this example, we'll just navigate to the home screen.
+      context.go('/main');
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Échec de l\'authentification biométrique.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -190,11 +220,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     const SizedBox(height: 32),
 
                     // Login Button
-                    CustomButton(
-                      text: 'Se connecter',
-                      onPressed: _login,
-                      isLoading: _isLoading,
-                      variant: ButtonVariant.primary,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: CustomButton(
+                            text: 'Se connecter',
+                            onPressed: _login,
+                            isLoading: _isLoading,
+                            variant: ButtonVariant.primary,
+                          ),
+                        ),
+                        if (_isBiometricAvailable) ...[
+                          const SizedBox(width: 16),
+                          Container(
+                             decoration: BoxDecoration(
+                                color: AppColors.primaryViolet.withOpacity(0.1),
+                                shape: BoxShape.circle,
+                              ),
+                            child: IconButton(
+                              onPressed: _authenticateWithBiometrics,
+                              icon: Icon(
+                                Icons.fingerprint,
+                                color: AppColors.primaryViolet,
+                                size: 28,
+                              ),
+                              tooltip: 'Login with Biometrics',
+                            ),
+                          ),
+                        ]
+                      ],
                     ),
 
                     const SizedBox(height: 24),

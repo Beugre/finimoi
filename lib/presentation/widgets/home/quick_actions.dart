@@ -101,6 +101,118 @@ class QuickActions extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _QuickActionItem(
+                icon: Icons.money_off,
+                title: 'Retrait',
+                subtitle: 'Retirer des fonds',
+                color: AppColors.error,
+                onTap: () {
+                  context.push('/withdraw');
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _QuickActionItem(
+                icon: Icons.link,
+                title: 'Lien de paiement',
+                subtitle: 'Recevoir de l\'argent',
+                color: AppColors.info,
+                onTap: () {
+                  context.push('/payments/link');
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _QuickActionItem(
+                icon: Icons.receipt_long,
+                title: 'Diviser une facture',
+                subtitle: 'Utiliser l\'OCR pour partager',
+                color: Colors.teal,
+                onTap: () {
+                  context.push('/split-bill');
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _QuickActionItem(
+                icon: Icons.store,
+                title: 'Nos Partenaires',
+                subtitle: 'Découvrez nos partenaires',
+                color: Colors.purple,
+                onTap: () {
+                  context.push('/partners');
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _QuickActionItem(
+                icon: Icons.favorite,
+                title: 'Faire un Don',
+                subtitle: 'Soutenir une cause',
+                color: Colors.redAccent,
+                onTap: () {
+                  context.push('/donations');
+                },
+              ),
+            ),
+             const SizedBox(width: 12),
+            Expanded(
+              child: _QuickActionItem(
+                icon: Icons.school,
+                title: 'Frais Scolaires',
+                subtitle: 'Payer les frais de scolarité',
+                color: Colors.brown,
+                onTap: () {
+                  context.push('/school-fees');
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _QuickActionItem(
+                icon: Icons.casino,
+                title: 'Loterie',
+                subtitle: 'Tentez votre chance',
+                color: Colors.deepOrange,
+                onTap: () {
+                  context.push('/lottery');
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _QuickActionItem(
+                icon: Icons.home_work,
+                title: 'Logement',
+                subtitle: 'Payer votre loyer',
+                color: Colors.lightGreen,
+                onTap: () {
+                  context.push('/housing');
+                },
+              ),
+            ),
+          ],
+        )
       ],
     );
   }

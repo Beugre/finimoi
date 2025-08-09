@@ -20,6 +20,7 @@ class CardModel {
   final String status;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final List<String> sharedWith;
 
   CardModel({
     required this.id,
@@ -37,6 +38,7 @@ class CardModel {
     required this.status,
     required this.createdAt,
     required this.updatedAt,
+    this.sharedWith = const [],
   });
 
   factory CardModel.fromFirestore(DocumentSnapshot doc) {
@@ -66,6 +68,7 @@ class CardModel {
                 ? (data['updatedAt'] as Timestamp).toDate()
                 : DateTime.now())
           : DateTime.now(),
+      sharedWith: List<String>.from(data['sharedWith'] ?? []),
     );
   }
 
@@ -85,6 +88,7 @@ class CardModel {
       'status': status,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
+      'sharedWith': sharedWith,
     };
   }
 

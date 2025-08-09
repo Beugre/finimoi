@@ -9,6 +9,7 @@ import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'data/services/preferences_service.dart';
 import 'data/services/deep_link_service.dart';
+import 'data/providers/notification_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -51,15 +52,32 @@ void main() async {
   setGlobalRouter(AppRouter.router);
 }
 
-class FinIMoiApp extends ConsumerWidget {
+class FinIMoiApp extends ConsumerStatefulWidget {
   const FinIMoiApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FinIMoiApp> createState() => _FinIMoiAppState();
+}
+
+class _FinIMoiAppState extends ConsumerState<FinIMoiApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Initialiser les services qui nécessitent le contexte ou une initialisation précoce
+    _initializeServices();
+  }
+
+  void _initializeServices() async {
+    // Initialiser le service de notifications
+    await ref.read(notificationServiceProvider).initialize();
+
     // Initialiser le service de deep links
     final deepLinkService = ref.read(deepLinkServiceProvider);
     deepLinkService.initialize();
+  }
 
+  @override
+  Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'FinIMoi',
       debugShowCheckedModeBanner: false,

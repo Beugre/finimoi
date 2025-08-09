@@ -23,6 +23,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _referralCodeController = TextEditingController();
 
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -62,6 +63,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
     _firstNameController.dispose();
     _lastNameController.dispose();
     _phoneController.dispose();
+    _referralCodeController.dispose();
     super.dispose();
   }
 
@@ -90,6 +92,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
         email: _emailController.text.trim(),
         password: _passwordController.text,
         fullName: fullName,
+        referralCode: _referralCodeController.text.trim(),
       );
 
       if (result != null && mounted) {
@@ -307,6 +310,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
               ),
             ),
           ],
+        ),
+
+        const SizedBox(height: 16),
+
+        // Referral Code (Optional)
+        CustomTextField(
+          controller: _referralCodeController,
+          label: 'Code de parrainage (Optionnel)',
+          hint: 'Entrez un code de parrainage',
+          prefixIcon: Icons.card_giftcard,
         ),
 
         const SizedBox(height: 16),

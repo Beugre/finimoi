@@ -4,6 +4,11 @@ import '../../domain/entities/transfer_model.dart';
 import '../../domain/entities/user_model.dart';
 import '../../domain/entities/chat_message.dart';
 import 'chat_service.dart';
+import 'gamification_service.dart';
+import 'notification_service.dart';
+import 'real_savings_service.dart';
+import 'user_service.dart';
+import '../../domain/entities/challenge_model.dart';
 
 class TransferService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -168,6 +173,21 @@ class TransferService {
         _updateTransferStats(transaction, currentUser.uid, request.amount);
       });
 
+      // Award points for the transfer
+      await GamificationService().awardPoints(currentUser.uid, 10, 'Transfer');
+
+      // Handle round-up savings
+      await _handleRoundUpSavings(currentUser.uid, request.amount);
+
+      // Update transfer challenge progress
+      await GamificationService().updateChallengeProgress(
+          currentUser.uid, ChallengeType.transfer, 1);
+
+      // Handle cashback for QR code payments
+      if (request.type == TransferType.qrCode) {
+        await _handleCashback(currentUser.uid, request.amount);
+      }
+
       // Traitement selon le type de transfert (seulement pour les transferts non internes)
       if (request.type != TransferType.internal) {
         await _processTransferByType(transfer);
@@ -322,8 +342,9 @@ class TransferService {
 
   /// Envoie une notification de transfert
   Future<void> _sendTransferNotification(TransferModel transfer) async {
+    final notificationService = NotificationService();
     // Notification à l'expéditeur
-    await _createNotification(
+    await notificationService.createNotification(
       userId: transfer.senderId,
       title: 'Transfert effectué',
       message: 'Transfert de ${transfer.amount} FCFA envoyé avec succès',
@@ -333,7 +354,7 @@ class TransferService {
 
     // Notification au destinataire (si transfert interne)
     if (transfer.recipientId != null) {
-      await _createNotification(
+      await notificationService.createNotification(
         userId: transfer.recipientId!,
         title: 'Argent reçu',
         message: 'Vous avez reçu ${transfer.amount} FCFA',
@@ -341,25 +362,6 @@ class TransferService {
         data: {'transferId': transfer.id},
       );
     }
-  }
-
-  /// Crée une notification
-  Future<void> _createNotification({
-    required String userId,
-    required String title,
-    required String message,
-    required String type,
-    Map<String, dynamic>? data,
-  }) async {
-    await _firestore.collection('notifications').add({
-      'userId': userId,
-      'title': title,
-      'message': message,
-      'type': type,
-      'data': data ?? {},
-      'read': false,
-      'createdAt': Timestamp.now(),
-    });
   }
 
   /// Met à jour les statistiques de transfert
@@ -759,5 +761,35 @@ class TransferService {
     if (amount <= 50000) return 1000;
     if (amount <= 100000) return 1500;
     return 2000; // Montants supérieurs
+  }
+
+  Future<void> _handleRoundUpSavings(String userId, double amount) async {
+    try {
+      final user = await UserService.getUserProfile(userId);
+      if (user != null && user.roundUpSavingsEnabled && user.roundUpSavingsGoalId != null) {
+        final roundUpAmount = amount.ceil() - amount;
+        if (roundUpAmount > 0) {
+          await RealSavingsService().addToSavings(user.roundUpSavingsGoalId!, userId, roundUpAmount);
+        }
+      }
+    } catch (e) {
+      // Log error, but don't fail the whole transfer
+      print('Error processing round-up savings: $e');
+    }
+  }
+
+  Future<void> _handleCashback(String userId, double amount) async {
+    try {
+      final cashbackAmount = amount * 0.01; // 1% cashback
+      if (cashbackAmount > 0) {
+        final userRef = _firestore.collection('users').doc(userId);
+        await userRef.update({
+          'cashbackBalance': FieldValue.increment(cashbackAmount),
+        });
+      }
+    } catch (e) {
+      // Log error, but don't fail the whole transfer
+      print('Error processing cashback: $e');
+    }
   }
 }

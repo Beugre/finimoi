@@ -317,6 +317,28 @@ class ChatService {
 
     return chatId;
   }
+
+  Future<String> createGroupChat({
+    required String groupName,
+    required List<String> memberIds,
+    required String createdBy,
+  }) async {
+    // This is a simplified version. In a real app, you'd fetch user data for participants.
+    final participants = memberIds.map((id) => ChatParticipant(
+      userId: id,
+      name: 'Utilisateur', // Placeholder
+      isOnline: false,
+      role: id == createdBy ? ChatRole.admin : ChatRole.member,
+    )).toList();
+
+    return await createChat(
+      name: groupName,
+      participantIds: memberIds,
+      participants: participants,
+      createdBy: createdBy,
+      type: ChatType.group,
+    );
+  }
 }
 
 // Providers

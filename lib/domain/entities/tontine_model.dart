@@ -12,6 +12,7 @@ class TontineMember {
   final DateTime joinedAt;
   final bool isActive;
   final int position;
+  final bool autoPayEnabled;
 
   TontineMember({
     required this.userId,
@@ -19,6 +20,7 @@ class TontineMember {
     required this.joinedAt,
     required this.isActive,
     required this.position,
+    this.autoPayEnabled = false,
   });
 
   factory TontineMember.fromMap(Map<String, dynamic> data) {
@@ -32,6 +34,7 @@ class TontineMember {
           : DateTime.now(),
       isActive: data['isActive'] ?? true,
       position: data['position'] ?? 0,
+      autoPayEnabled: data['autoPayEnabled'] ?? false,
     );
   }
 
@@ -42,6 +45,7 @@ class TontineMember {
       'joinedAt': Timestamp.fromDate(joinedAt),
       'isActive': isActive,
       'position': position,
+      'autoPayEnabled': autoPayEnabled,
     };
   }
 }
@@ -224,6 +228,22 @@ class TontineModel {
         return 'Terminée';
       case TontineStatus.cancelled:
         return 'Annulée';
+    }
+  }
+
+  DateTime get nextDueDate {
+    if (status != TontineStatus.active) {
+      return DateTime.now(); // Or handle appropriately
+    }
+    switch (frequency) {
+      case TontineFrequency.weekly:
+        return startDate.add(Duration(days: 7 * currentCycle));
+      case TontineFrequency.biweekly:
+        return startDate.add(Duration(days: 14 * currentCycle));
+      case TontineFrequency.monthly:
+        return DateTime(startDate.year, startDate.month + currentCycle, startDate.day);
+      case TontineFrequency.quarterly:
+        return DateTime(startDate.year, startDate.month + (3 * currentCycle), startDate.day);
     }
   }
 }

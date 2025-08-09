@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../data/providers/user_provider.dart';
 import '../../data/providers/auth_provider.dart';
+import '../../domain/entities/user_model.dart';
 import '../../data/services/payment_service.dart';
 import '../../data/services/user_service.dart';
 
@@ -34,21 +35,15 @@ class _RechargeScreenState extends ConsumerState<RechargeScreen> {
     super.dispose();
   }
 
-  Future<void> _processRecharge(double amount) async {
+  Future<void> _processRecharge(double amount, UserModel user) async {
     setState(() {
       _isLoading = true;
     });
 
     try {
       final currentUser = ref.read(currentUserProvider);
-      final userProfile = await ref.read(userProfileProvider.future);
-
       if (currentUser == null) {
         throw Exception('Utilisateur non connecté');
-      }
-
-      if (userProfile == null) {
-        throw Exception('Profil utilisateur non trouvé');
       }
 
       // Initier le paiement via le service professionnel
@@ -60,15 +55,13 @@ class _RechargeScreenState extends ConsumerState<RechargeScreen> {
         metadata: {
           'description': 'Recharge compte FinIMoi',
           'timestamp': DateTime.now().toIso8601String(),
-          'userName': userProfile.fullName,
+          'userName': user.fullName,
         },
       );
 
       if (mounted) {
         if (paymentTransaction.status == PaymentStatus.completed) {
-          // Mettre à jour le solde de l'utilisateur directement
-          await UserService.addToBalance(currentUser.uid, amount);
-
+          // Le solde est déjà mis à jour par le PaymentService.
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -231,7 +224,7 @@ class _RechargeScreenState extends ConsumerState<RechargeScreen> {
                 itemCount: _predefinedAmounts.length,
                 itemBuilder: (context, index) {
                   final amount = _predefinedAmounts[index];
-                  return _buildAmountButton(amount);
+                  return _buildAmountButton(amount, user);
                 },
               ),
 
@@ -270,14 +263,14 @@ class _RechargeScreenState extends ConsumerState<RechargeScreen> {
                   SizedBox(
                     width: 120,
                     child: ElevatedButton(
-                      onPressed: _isLoading
+                      onPressed: _isLoading || user == null
                           ? null
                           : () {
                               final amount = double.tryParse(
                                 _amountController.text,
                               );
                               if (amount != null && amount >= 100) {
-                                _processRecharge(amount);
+                                _processRecharge(amount, user!);
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
@@ -391,9 +384,10 @@ class _RechargeScreenState extends ConsumerState<RechargeScreen> {
     );
   }
 
-  Widget _buildAmountButton(double amount) {
+  Widget _buildAmountButton(double amount, UserModel? user) {
     return ElevatedButton(
-      onPressed: _isLoading ? null : () => _processRecharge(amount),
+      onPressed:
+          _isLoading || user == null ? null : () => _processRecharge(amount, user),
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.primaryViolet.withOpacity(0.1),
         foregroundColor: AppColors.primaryViolet,

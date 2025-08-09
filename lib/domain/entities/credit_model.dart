@@ -17,6 +17,7 @@ class CreditModel {
   final DateTime createdAt;
   final DateTime updatedAt;
   final Map<String, dynamic>? metadata;
+  final List<String>? documentUrls;
 
   CreditModel({
     required this.id,
@@ -34,6 +35,7 @@ class CreditModel {
     required this.createdAt,
     required this.updatedAt,
     this.metadata,
+    this.documentUrls,
   });
 
   // Factory constructor depuis Firestore
@@ -57,6 +59,7 @@ class CreditModel {
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       metadata: data['metadata'] as Map<String, dynamic>?,
+      documentUrls: List<String>.from(data['documentUrls'] ?? []),
     );
   }
 
@@ -82,6 +85,7 @@ class CreditModel {
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
       'metadata': metadata,
+      'documentUrls': documentUrls,
     };
   }
 
@@ -133,6 +137,7 @@ class CreditModel {
     DateTime? createdAt,
     DateTime? updatedAt,
     Map<String, dynamic>? metadata,
+    List<String>? documentUrls,
   }) {
     return CreditModel(
       id: id ?? this.id,
@@ -150,6 +155,7 @@ class CreditModel {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       metadata: metadata ?? this.metadata,
+      documentUrls: documentUrls ?? this.documentUrls,
     );
   }
 
@@ -157,4 +163,24 @@ class CreditModel {
   String toString() {
     return 'CreditModel(id: $id, amount: $amount, purpose: $purpose, status: $status)';
   }
+}
+
+class RepaymentSchedule {
+  final int month;
+  final DateTime dueDate;
+  final double principal;
+  final double interest;
+  final double totalPayment;
+  final double remainingBalance;
+  bool isPaid;
+
+  RepaymentSchedule({
+    required this.month,
+    required this.dueDate,
+    required this.principal,
+    required this.interest,
+    required this.totalPayment,
+    required this.remainingBalance,
+    this.isPaid = false,
+  });
 }

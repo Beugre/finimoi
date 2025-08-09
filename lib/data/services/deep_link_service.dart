@@ -66,6 +66,15 @@ class DeepLinkService {
             print('❌ Router global non disponible');
           }
         }
+      } else if (uri.scheme == 'finimoi' && uri.path == '/pay') {
+        final merchantId = uri.queryParameters['merchantId'];
+        final userId = uri.queryParameters['userId'];
+        if (merchantId != null && _globalRouter != null) {
+          _globalRouter!.push('/merchant/pay', extra: merchantId);
+        } else if (userId != null && _globalRouter != null) {
+          // We can reuse the merchant payment screen for user payments
+          _globalRouter!.push('/merchant/pay', extra: userId);
+        }
       }
     }
   }

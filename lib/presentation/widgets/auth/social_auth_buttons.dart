@@ -41,6 +41,17 @@ class SocialAuthButtons extends StatelessWidget {
 
         const SizedBox(height: 12),
 
+        // Phone Sign In
+        _SocialButton(
+          icon: Icons.phone_outlined,
+          label: isLogin
+              ? 'Continuer avec le téléphone'
+              : 'S\'inscrire avec le téléphone',
+          onPressed: () => context.push('/auth/phone'),
+          backgroundColor: Colors.green,
+          textColor: Colors.white,
+        ),
+
         // Apple Sign In (temporairement désactivé - problème entitlements)
         // _SocialButton(
         //   icon: Icons.apple,
