@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/tontine_model.dart';
+import 'notification_service.dart';
 
 final realTontineServiceProvider = Provider<RealTontineService>((ref) {
   return RealTontineService();
@@ -218,6 +219,95 @@ class RealTontineService {
         'totalContributions': 0.0,
         'averageContribution': 0.0,
       };
+    }
+  }
+
+  // Simulated scheduled function to send reminders
+  Future<void> sendTontineReminders() async {
+    final notificationService = NotificationService();
+    final now = DateTime.now();
+
+    final snapshot = await _tontinesRef
+        .where('status', isEqualTo: TontineStatus.active.name)
+        .get();
+
+    for (final doc in snapshot.docs) {
+      final tontine = TontineModel.fromFirestore(doc);
+      final dueDate = tontine.nextDueDate;
+
+      // Send reminder 3 days before due date
+      if (dueDate.isAfter(now) && dueDate.difference(now).inDays <= 3) {
+        for (final memberId in tontine.memberIds) {
+          await notificationService.createNotification(
+            userId: memberId,
+            title: 'Rappel de Tontine',
+            message:
+                'Votre contribution de ${tontine.contributionAmount.toInt()} FCFA pour la tontine "${tontine.name}" est bientôt due!',
+            type: 'tontine_reminder',
+            data: {'tontineId': tontine.id},
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> updateAutoPayStatus(
+      String tontineId, String userId, bool autoPayEnabled) async {
+    try {
+      final tontineDoc = await _tontinesRef.doc(tontineId).get();
+      if (!tontineDoc.exists) {
+        throw Exception('Tontine non trouvée');
+      }
+
+      final tontineData = tontineDoc.data() as Map<String, dynamic>;
+      final members =
+          (tontineData['members'] as List<dynamic>?)?.map((m) => m as Map<String, dynamic>).toList() ?? [];
+
+      final memberIndex = members.indexWhere((m) => m['userId'] == userId);
+      if (memberIndex == -1) {
+        throw Exception('Membre non trouvé dans cette tontine');
+      }
+
+      members[memberIndex]['autoPayEnabled'] = autoPayEnabled;
+
+      await _tontinesRef.doc(tontineId).update({
+        'members': members,
+        'updatedAt': Timestamp.now(),
+      });
+    } catch (e) {
+      throw Exception('Erreur lors de la mise à jour du statut de paiement automatique: $e');
+    }
+  }
+
+  // Simulated scheduled function to process automatic payments
+  Future<void> processAutomaticPayments() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    final snapshot = await _tontinesRef
+        .where('status', isEqualTo: TontineStatus.active.name)
+        .get();
+
+    for (final doc in snapshot.docs) {
+      final tontine = TontineModel.fromFirestore(doc);
+      final dueDate = tontine.nextDueDate;
+      final todayDueDate = DateTime(dueDate.year, dueDate.month, dueDate.day);
+
+      if (todayDueDate == today) {
+        for (final member in tontine.members) {
+          if (member.autoPayEnabled && member.isActive) {
+            try {
+              // It's better to call the existing makeContribution method
+              // This is a simulation, in a real app, this would be more robust
+              await makeContribution(tontine.id, member.userId, tontine.contributionAmount);
+              print('Automatic payment processed for ${member.name} in tontine ${tontine.name}');
+            } catch (e) {
+              print('Failed to process automatic payment for ${member.name}: $e');
+              // Optionally, send a notification to the user about the failure
+            }
+          }
+        }
+      }
     }
   }
 }

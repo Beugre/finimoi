@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/providers/auth_provider.dart';
 import '../../../data/providers/user_provider.dart';
@@ -25,6 +26,10 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   final _addressController = TextEditingController();
   final _cityController = TextEditingController();
   final _countryController = TextEditingController();
+  final _finimoiTagController = TextEditingController();
+  final _dobController = TextEditingController();
+  String? _selectedGender;
+  DateTime? _selectedDateOfBirth;
 
   File? _selectedImage;
   bool _isLoading = false;
@@ -43,9 +48,15 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           _firstNameController.text = user.firstName;
           _lastNameController.text = user.lastName;
           _phoneController.text = user.phoneNumber ?? '';
+          _finimoiTagController.text = user.finimoiTag ?? '';
           _addressController.text = user.address ?? '';
           _cityController.text = user.city ?? '';
           _countryController.text = user.country ?? 'France';
+          _selectedGender = user.gender;
+          _selectedDateOfBirth = user.dateOfBirth;
+           if (user.dateOfBirth != null) {
+            _dobController.text = DateFormat('dd/MM/yyyy').format(user.dateOfBirth!);
+          }
         }
       },
       loading: () {},
@@ -80,10 +91,14 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       final currentUser = ref.read(currentUserProvider);
       if (currentUser == null) throw Exception('Utilisateur non connecté');
 
+      // TODO: Add validation for finimoiTag uniqueness
       final updateData = {
         'firstName': _firstNameController.text.trim(),
         'lastName': _lastNameController.text.trim(),
         'phoneNumber': _phoneController.text.trim(),
+        'finimoiTag': _finimoiTagController.text.trim(),
+        'gender': _selectedGender,
+        'dateOfBirth': _selectedDateOfBirth,
         'address': _addressController.text.trim(),
         'city': _cityController.text.trim(),
         'country': _countryController.text.trim(),
@@ -286,6 +301,60 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                         hint: 'Entrez votre numéro',
                         prefixIcon: Icons.phone_outlined,
                         keyboardType: TextInputType.phone,
+                      ),
+
+                      const SizedBox(height: 16),
+                      CustomTextField(
+                        controller: _finimoiTagController,
+                        label: '@finimoiTag',
+                        hint: 'Entrez votre tag unique',
+                        prefixIcon: Icons.alternate_email,
+                      ),
+
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: _selectedGender,
+                              items: const [
+                                DropdownMenuItem(value: 'Homme', child: Text('Homme')),
+                                DropdownMenuItem(value: 'Femme', child: Text('Femme')),
+                                DropdownMenuItem(value: 'Autre', child: Text('Autre')),
+                              ],
+                              onChanged: (value) => setState(() => _selectedGender = value),
+                              decoration: const InputDecoration(
+                                labelText: 'Genre',
+                                prefixIcon: Icon(Icons.wc),
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: CustomTextField(
+                              controller: _dobController,
+                              label: 'Date de naissance',
+                              hint: 'JJ/MM/AAAA',
+                              prefixIcon: Icons.calendar_today_outlined,
+                              readOnly: true,
+                              onTap: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: _selectedDateOfBirth ?? DateTime(2000),
+                                  firstDate: DateTime(1920),
+                                  lastDate: DateTime.now(),
+                                );
+                                if (picked != null) {
+                                  setState(() {
+                                    _selectedDateOfBirth = picked;
+                                    _dobController.text = DateFormat('dd/MM/yyyy').format(picked);
+                                  });
+                                }
+                              },
+                            ),
+                          ),
+                        ],
                       ),
 
                       const SizedBox(height: 32),
@@ -681,6 +750,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     _addressController.dispose();
     _cityController.dispose();
     _countryController.dispose();
+    _finimoiTagController.dispose();
+    _dobController.dispose();
     super.dispose();
   }
 }

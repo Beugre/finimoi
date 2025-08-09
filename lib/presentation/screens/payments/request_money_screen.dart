@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/providers/auth_provider.dart';
 import '../../../data/services/user_service.dart';
+import '../../../data/services/chat_service.dart';
+import '../../../domain/entities/chat_message.dart';
 import '../../widgets/common/custom_app_bar.dart';
 import '../../widgets/common/custom_button.dart';
 import '../../widgets/common/custom_text_field.dart';
@@ -58,11 +60,22 @@ class _RequestMoneyScreenState extends ConsumerState<RequestMoneyScreen> {
         );
       }
 
-      // TODO: Implémenter la demande d'argent avec le nouveau système
-      // Pour l'instant, on peut créer une notification ou un message
+      final amount = double.parse(_amountController.text);
+      final description = _descriptionController.text.trim();
+      final chatService = ref.read(chatServiceProvider);
 
-      // Simuler le succès pour l'instant
-      await Future.delayed(const Duration(milliseconds: 500));
+      final chatId =
+          await chatService.getOrCreateDirectChat(currentUser.uid, recipient.id);
+
+      await chatService.sendPaymentMessage(
+        chatId: chatId,
+        senderId: currentUser.uid,
+        senderName: currentUser.displayName ?? 'Utilisateur',
+        senderAvatar: currentUser.photoURL ?? '',
+        description: description,
+        amount: amount,
+        buttonType: PaymentButtonType.request,
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

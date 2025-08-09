@@ -1,5 +1,10 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/providers/user_provider.dart';
 import '../../../domain/entities/transfer_model.dart';
@@ -208,30 +213,36 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
     );
   }
 
+  List<TransferModel> _getFilteredTransactions(
+    List<TransferModel> transactions,
+    TransferType? type,
+  ) {
+    return transactions.where((transaction) {
+      if (type != null && transaction.type != type) return false;
+      if (_searchQuery.isNotEmpty) {
+        return transaction.description
+                ?.toLowerCase()
+                .contains(_searchQuery.toLowerCase()) ??
+            false;
+      }
+      if (_selectedDateRange != null) {
+        return transaction.createdAt.toDate().isAfter(
+              _selectedDateRange!.start,
+            ) &&
+            transaction.createdAt.toDate().isBefore(
+              _selectedDateRange!.end,
+            );
+      }
+      return true;
+    }).toList();
+  }
+
   Widget _buildTransactionsList(TransferType? type) {
     final transactionsAsync = ref.watch(userTransactionsProvider);
 
     return transactionsAsync.when(
       data: (transactions) {
-        // Filtrer par type si spécifié
-        var filteredTransactions = transactions.where((transaction) {
-          if (type != null && transaction.type != type) return false;
-          if (_searchQuery.isNotEmpty) {
-            return transaction.description?.toLowerCase().contains(
-                  _searchQuery.toLowerCase(),
-                ) ??
-                false;
-          }
-          if (_selectedDateRange != null) {
-            return transaction.createdAt.toDate().isAfter(
-                  _selectedDateRange!.start,
-                ) &&
-                transaction.createdAt.toDate().isBefore(
-                  _selectedDateRange!.end,
-                );
-          }
-          return true;
-        }).toList();
+        final filteredTransactions = _getFilteredTransactions(transactions, type);
 
         if (filteredTransactions.isEmpty) {
           return _buildEmptyState();
@@ -634,27 +645,50 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
   }
 
   void _showTransactionDetails(TransferModel transaction) {
+    final isOutgoing = transaction.amount < 0;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(_getTransactionTitle(transaction.type)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildDetailRow('ID', transaction.id),
-            _buildDetailRow(
-              'Montant',
-              '${transaction.amount.toStringAsFixed(0)} FCFA',
-            ),
-            _buildDetailRow(
-              'Date',
-              _formatDateTime(transaction.createdAt.toDate()),
-            ),
-            _buildDetailRow('Statut', _getStatusText(transaction.status)),
-            if (transaction.description != null)
-              _buildDetailRow('Description', transaction.description!),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildDetailRow('Référence', transaction.reference),
+              _buildDetailRow(
+                isOutgoing ? 'Destinataire' : 'Expéditeur',
+                transaction.recipientName ?? 'N/A',
+              ),
+              _buildDetailRow(
+                'Montant',
+                '${transaction.amount.abs().toStringAsFixed(0)} FCFA',
+              ),
+              if (isOutgoing)
+                _buildDetailRow(
+                  'Frais',
+                  '${transaction.fees.toStringAsFixed(0)} FCFA',
+                ),
+              if (isOutgoing)
+                _buildDetailRow(
+                  'Total débité',
+                  '${transaction.totalAmount.abs().toStringAsFixed(0)} FCFA',
+                ),
+              _buildDetailRow(
+                'Date',
+                _formatDateTime(transaction.createdAt.toDate()),
+              ),
+              _buildDetailRow('Statut', _getStatusText(transaction.status)),
+              if (transaction.description != null &&
+                  transaction.description!.isNotEmpty)
+                _buildDetailRow('Description', transaction.description!),
+              if (transaction.status == TransferStatus.failed &&
+                  transaction.failureReason != null)
+                _buildDetailRow('Raison de l\'échec',
+                    transaction.failureReason!),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -736,97 +770,98 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
   }
 
   Future<void> _generateExport(String format) async {
-    try {
-      // Afficher un indicateur de progression
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const AlertDialog(
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Génération du fichier en cours...'),
-            ],
-          ),
+    final transactions = ref.read(userTransactionsProvider).asData?.value ?? [];
+    if (transactions.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Aucune transaction à exporter')),
+      );
+      return;
+    }
+
+    final currentTabType = _tabController.index == 0
+        ? null
+        : TransferType.values[_tabController.index - 1];
+    final filteredTransactions =
+        _getFilteredTransactions(transactions, currentTabType);
+
+    if (filteredTransactions.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Aucune transaction ne correspond à vos filtres'),
         ),
       );
+      return;
+    }
 
-      // Simulation de la génération
-      await Future.delayed(const Duration(seconds: 2));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Génération du PDF en cours...')),
+    );
 
-      Navigator.pop(context); // Fermer le dialog de progression
-
-      final fileName =
-          'transactions_${DateTime.now().millisecondsSinceEpoch}.$format';
-
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Export terminé'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.check_circle, color: Colors.green, size: 48),
-              const SizedBox(height: 16),
-              Text('Fichier généré: $fileName'),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text(
-                  'Le fichier a été téléchargé dans votre dossier Téléchargements.',
-                  style: TextStyle(fontSize: 12),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Fermer'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _shareExportFile(fileName);
-              },
-              child: const Text('Partager'),
-            ),
-          ],
-        ),
+    try {
+      final pdfBytes = await _generatePdf(filteredTransactions);
+      await Printing.sharePdf(
+        bytes: pdfBytes,
+        filename: 'releve_transactions.pdf',
       );
     } catch (e) {
-      Navigator.pop(context); // Fermer le dialog de progression en cas d'erreur
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur lors de l\'export: $e'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('Erreur lors de la création du PDF: $e')),
       );
     }
   }
 
-  void _shareExportFile(String fileName) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Partage de $fileName...'),
-        backgroundColor: Colors.blue,
-        action: SnackBarAction(
-          label: 'Email',
-          onPressed: () {
-            // Simulation d'ouverture du client email
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Client email ouvert !')),
-            );
-          },
-        ),
+  Future<Uint8List> _generatePdf(
+      List<TransferModel> transactions) async {
+    final doc = pw.Document();
+    final font = await PdfGoogleFonts.robotoRegular();
+    final boldFont = await PdfGoogleFonts.robotoBold();
+
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        build: (context) => [
+          pw.Header(
+            level: 0,
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('Relevé de Transactions',
+                    style: pw.TextStyle(font: boldFont, fontSize: 20)),
+                pw.Text(
+                  _formatDateRange(
+                    _selectedDateRange ??
+                        DateTimeRange(
+                          start: transactions.last.createdAt.toDate(),
+                          end: transactions.first.createdAt.toDate(),
+                        ),
+                  ),
+                  style: pw.TextStyle(font: font, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          pw.Table.fromTextArray(
+            headers: ['Date', 'Description', 'Montant', 'Statut'],
+            headerStyle: pw.TextStyle(font: boldFont),
+            cellStyle: pw.TextStyle(font: font),
+            data: transactions.map((tr) {
+              final isOutgoing = tr.amount < 0;
+              return [
+                _formatDateTime(tr.createdAt.toDate()),
+                tr.description ?? _getTransactionTitle(tr.type),
+                '${isOutgoing ? '-' : '+'} ${tr.amount.abs().toStringAsFixed(0)} FCFA',
+                _getStatusText(tr.status),
+              ];
+            }).toList(),
+          ),
+        ],
       ),
     );
+
+    return doc.save();
+  }
+
+  void _shareExportFile(String fileName) {
+    // This function is no longer needed as Printing.sharePdf handles it.
   }
 }

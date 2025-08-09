@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/providers/user_provider.dart';
 import '../../../data/services/cinetpay_service.dart';
+import '../../../data/services/stripe_service.dart';
 import '../../../data/services/currency_service.dart';
 import '../../widgets/common/custom_app_bar.dart';
 import 'package:intl/intl.dart';
@@ -24,12 +25,25 @@ class _RechargeScreenState extends ConsumerState<RechargeScreen> {
   String _selectedCurrency = 'XOF'; // Devise par défaut
   String _selectedOperator = 'ORANGE_MONEY_CI'; // Opérateur par défaut
   bool _isLoading = false;
+  final StripeService _stripeService = StripeService();
+
+  @override
+  void initState() {
+    super.initState();
+    _stripeService.initStripe();
+  }
 
   // Montants prédéfinis
   final List<double> _quickAmounts = [1000, 2500, 5000, 10000, 25000, 50000];
 
   // Méthodes de paiement CinetPay
   final Map<String, Map<String, dynamic>> _paymentMethods = {
+    'INTERNATIONAL_CARD': {
+      'name': 'Carte Internationale',
+      'icon': Icons.credit_card,
+      'color': Colors.blue,
+      'description': 'Payer avec une carte Visa, Mastercard, etc.',
+    },
     'ORANGE_MONEY_CI': {
       'name': 'Orange Money',
       'icon': Icons.phone_android,
@@ -639,7 +653,7 @@ class _RechargeScreenState extends ConsumerState<RechargeScreen> {
     if (amount <= 0) return false;
     if (_selectedMethod == null) return false;
 
-    if (_selectedMethod == 'mobile_money') {
+    if (_selectedMethod != 'INTERNATIONAL_CARD') {
       return _phoneController.text.trim().isNotEmpty;
     }
 
@@ -648,6 +662,13 @@ class _RechargeScreenState extends ConsumerState<RechargeScreen> {
 
   void _processRecharge() async {
     if (!_isFormValid() || _isLoading) return;
+
+    if (_selectedMethod == 'INTERNATIONAL_CARD') {
+      setState(() => _isLoading = true);
+      await _stripeService.presentPaymentSheet(context, amount: _getSelectedAmount());
+      setState(() => _isLoading = false);
+      return;
+    }
 
     // Afficher la modale de confirmation
     final confirmed = await _showConfirmationDialog();

@@ -94,5 +94,7 @@
 		<string>moov</string>
 		<string>wave</string>
 	</array>
+	<key>NSFaceIDUsageDescription</key>
+	<string>FinIMoi utilise Face ID pour vous permettre de vous connecter de manière sécurisée.</string>
 </dict>
 </plist>

@@ -6,9 +6,10 @@ import '../../../data/providers/auth_provider.dart';
 import '../../../data/providers/user_provider.dart';
 import '../../../data/services/test_data_service.dart';
 import '../../../debug/transaction_debugger.dart';
-import '../../providers/savings_providers.dart';
+import '../../providers/real_savings_provider.dart';
 import '../../providers/card_providers.dart';
 import '../../providers/chat_providers.dart';
+import '../../../domain/entities/savings_model.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -124,6 +125,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
             // Apparence Section
             _buildSection(
+              title: 'Épargne',
+              children: [
+                _buildSwitchTile(
+                  icon: Icons.add_circle_outline,
+                  title: 'Arrondi automatique',
+                  subtitle: 'Épargnez la petite monnaie de vos transactions',
+                  value: ref.watch(userProfileProvider).value?.roundUpSavingsEnabled ?? false,
+                  onChanged: (value) {
+                    final userId = ref.read(currentUserProvider)?.uid;
+                    if (userId != null) {
+                      ref.read(userServiceProvider).updateUserProfile(userId, {'roundUpSavingsEnabled': value});
+                    }
+                  },
+                ),
+                _buildSettingsTile(
+                  icon: Icons.savings,
+                  title: 'Objectif pour l\'arrondi',
+                  subtitle: 'Choisir un objectif pour recevoir l\'arrondi',
+                  onTap: () => _showRoundUpGoalDialog(),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+
+            _buildSection(
               title: 'Apparence',
               children: [
                 _buildSwitchTile(
@@ -139,6 +166,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   subtitle: 'Français',
                   onTap: () => _showLanguageDialog(),
                 ),
+                 _buildSettingsTile(
+                  icon: Icons.view_quilt,
+                  title: 'Personnaliser l\'accueil',
+                  subtitle: 'Réorganiser les sections de l\'accueil',
+                  onTap: () => context.push('/settings/customize-home'),
+                ),
               ],
             ),
 
@@ -148,6 +181,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _buildSection(
               title: 'Debug (Développement)',
               children: [
+                 _buildSettingsTile(
+                  icon: Icons.settings_applications,
+                  title: 'Debug Menu',
+                  subtitle: 'Actions spéciales de débogage',
+                  onTap: () => context.push('/settings/debug'),
+                ),
                 _buildSettingsTile(
                   icon: Icons.data_object,
                   title: 'Initialiser données de test',
@@ -751,7 +790,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     // Invalider tous les providers pour forcer le rechargement
     ref.invalidate(userTransactionsProvider);
     ref.invalidate(recentTransactionsProvider);
-    // ref.invalidate(frequentContactsProvider); // TODO: À réimplémenter avec le nouveau système
     ref.invalidate(userSavingsProvider);
     ref.invalidate(userCardsProvider);
     ref.invalidate(userConversationsProvider);
@@ -858,5 +896,44 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         );
       }
     }
+  }
+
+  void _showRoundUpGoalDialog() {
+    final userId = ref.read(currentUserProvider)?.uid;
+    if (userId == null) return;
+
+    final savingsAsync = ref.watch(userSavingsProvider(userId));
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return savingsAsync.when(
+          data: (savings) {
+            return AlertDialog(
+              title: const Text('Choisir un objectif'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: savings.length,
+                  itemBuilder: (context, index) {
+                    final goal = savings[index];
+                    return ListTile(
+                      title: Text(goal.goalName),
+                      onTap: () {
+                        ref.read(userServiceProvider).updateUserProfile(userId, {'roundUpSavingsGoalId': goal.id});
+                        Navigator.pop(context);
+                      },
+                    );
+                  },
+                ),
+              ),
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, s) => Text('Erreur: $e'),
+        );
+      },
+    );
   }
 }

@@ -1,6 +1,12 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../data/providers/auth_provider.dart';
+import '../../../data/providers/real_credit_provider.dart';
+import '../../../data/providers/gamification_provider.dart';
 
 class CreditScreen extends ConsumerStatefulWidget {
   const CreditScreen({super.key});
@@ -26,6 +32,7 @@ class _CreditScreenState extends ConsumerState<CreditScreen>
   String _selectedCreditType = 'personnel';
   double _requestedAmount = 50000;
   int _durationMonths = 12;
+  List<String> _documentUrls = [];
 
   @override
   void initState() {
@@ -80,105 +87,159 @@ class _CreditScreenState extends ConsumerState<CreditScreen>
   }
 
   Widget _buildMyCreditsTab() {
+    final userId = ref.watch(authProvider).currentUser?.uid;
+    if (userId == null) {
+      return const Center(child: Text('Veuillez vous connecter.'));
+    }
+
+    final creditsAsync = ref.watch(userCreditsProvider(userId));
+    final statsAsync = ref.watch(creditStatsProvider(userId));
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Résumé des crédits
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [AppColors.primaryViolet, AppColors.secondary],
+        statsAsync.when(
+          data: (stats) => Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [AppColors.primaryViolet, AppColors.secondary],
+              ),
+              borderRadius: BorderRadius.circular(16),
             ),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Mes crédits en cours',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Mes crédits en cours',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Total emprunté',
-                        style: TextStyle(color: Colors.white70, fontSize: 14),
-                      ),
-                      const Text(
-                        '125 000 FCFA',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Total emprunté',
+                          style: TextStyle(color: Colors.white70, fontSize: 14),
                         ),
-                      ),
-                    ],
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      const Text(
-                        'Reste à payer',
-                        style: TextStyle(color: Colors.white70, fontSize: 14),
-                      ),
-                      const Text(
-                        '78 500 FCFA',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
+                        Text(
+                          '${stats['totalBorrowed']?.toStringAsFixed(0) ?? '0'} FCFA',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        const Text(
+                          'Reste à payer',
+                          style: TextStyle(color: Colors.white70, fontSize: 14),
+                        ),
+                        Text(
+                          '${stats['totalRemaining']?.toStringAsFixed(0) ?? '0'} FCFA',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (err, stack) => Text('Erreur: $err'),
         ),
         const SizedBox(height: 24),
-
-        // Liste des crédits
-        _buildCreditCard(
-          title: 'Crédit personnel',
-          amount: '125 000 FCFA',
-          remaining: '78 500 FCFA',
-          nextPayment: '15 500 FCFA',
-          dueDate: '15 Jan 2024',
-          progress: 0.37,
-          status: 'En cours',
-        ),
-        const SizedBox(height: 12),
-        _buildCreditCard(
-          title: 'Crédit équipement',
-          amount: '75 000 FCFA',
-          remaining: '0 FCFA',
-          nextPayment: 'Soldé',
-          dueDate: 'Terminé',
-          progress: 1.0,
-          status: 'Soldé',
+        creditsAsync.when(
+          data: (credits) {
+            if (credits.isEmpty) {
+              return const Center(child: Text('Aucun crédit trouvé.'));
+            }
+            return ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: credits.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final credit = credits[index];
+          return GestureDetector(
+            onTap: () => context.push('/credit/${credit.id}/schedule', extra: credit),
+            child: _buildCreditCard(
+              title: credit.purpose,
+              amount: '${credit.amount.toStringAsFixed(0)} FCFA',
+              remaining: '${credit.remainingAmount.toStringAsFixed(0)} FCFA',
+              nextPayment:
+                  '${credit.monthlyPayment.toStringAsFixed(0)} FCFA',
+              dueDate: credit.nextPaymentDate?.toString() ?? 'N/A',
+              progress: credit.progressPercentage / 100,
+              status: credit.statusText,
+            ),
+                );
+              },
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (err, stack) => Text('Erreur: $err'),
         ),
       ],
     );
   }
 
   Widget _buildNewRequestTab() {
+    final gamificationProfileAsync = ref.watch(gamificationProfileProvider);
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
+          // Credit Score Badge
+          gamificationProfileAsync.when(
+            data: (profile) {
+              final score = profile?.points ?? 0;
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.shield_outlined, color: Colors.blue[800]),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Votre score de fiabilité: $score',
+                      style: TextStyle(
+                        color: Colors.blue[800],
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+            loading: () => const SizedBox.shrink(),
+            error: (e, s) => const SizedBox.shrink(),
+          ),
+          const SizedBox(height: 16),
+
           // Indicateur d'étapes
           Container(
             padding: const EdgeInsets.all(16),
@@ -1044,43 +1105,98 @@ class _CreditScreenState extends ConsumerState<CreditScreen>
     }
   }
 
-  void _submitRequest() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Demande soumise'),
-        content: const Text(
-          'Votre demande de crédit a été soumise avec succès. '
-          'Vous recevrez une réponse sous 48h.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() {
-                _currentStep = 0;
-                _tabController.index = 0;
-              });
-              _pageController.animateToPage(
-                0,
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeInOut,
-              );
-            },
-            child: const Text('OK'),
+  void _submitRequest() async {
+    final userId = ref.read(authProvider).currentUser?.uid;
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Veuillez vous connecter.')),
+      );
+      return;
+    }
+
+    try {
+      // This is not ideal, I should add documentUrls to the requestCredit method
+      // For now, I will just create the request and then update it with the urls
+      final creditId = await ref.read(realCreditServiceProvider).requestCredit(
+            userId: userId,
+            amount: _requestedAmount,
+            purpose: _purposeController.text,
+            duration: _durationMonths,
+          );
+
+      await FirebaseFirestore.instance.collection('credits').doc(creditId).update({
+        'documentUrls': _documentUrls,
+      });
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Demande soumise'),
+            content: const Text(
+              'Votre demande de crédit a été soumise avec succès. '
+              'Vous recevrez une réponse sous 48h.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  setState(() {
+                    _currentStep = 0;
+                    _tabController.index = 0;
+                  });
+                  _pageController.animateToPage(
+                    0,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                },
+                child: const Text('OK'),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: ${e.toString()}')),
+        );
+      }
+    }
   }
 
-  void _uploadDocuments() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Fonction de téléchargement à venir...'),
-        backgroundColor: AppColors.info,
-      ),
-    );
+  Future<void> _uploadDocuments() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+    if (pickedFile != null) {
+      final file = File(pickedFile.path);
+      final userId = ref.read(authProvider).currentUser?.uid;
+      if (userId == null) return;
+
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('credit_documents/$userId/${DateTime.now().millisecondsSinceEpoch}');
+
+      try {
+        final uploadTask = storageRef.putFile(file);
+        final snapshot = await uploadTask.whenComplete(() => {});
+        final downloadUrl = await snapshot.ref.getDownloadURL();
+
+        setState(() {
+          _documentUrls.add(downloadUrl);
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Document téléchargé avec succès!')),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur de téléchargement: $e')),
+        );
+      }
+    }
   }
 
   void _selectOffer(String offerTitle) {

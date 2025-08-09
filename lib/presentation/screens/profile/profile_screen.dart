@@ -50,6 +50,101 @@ class ProfileScreen extends ConsumerWidget {
 
             const SizedBox(height: 40),
 
+            // Statistics Button
+            SizedBox(
+              width: double.infinity,
+              child: CustomButton(
+                text: 'Statistiques',
+                onPressed: () {
+                  context.push('/stats');
+                },
+                variant: ButtonVariant.secondary,
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Gift Card Buttons
+            SizedBox(
+              width: double.infinity,
+              child: CustomButton(
+                text: 'Mon Coffre à Cadeaux',
+                onPressed: () {
+                  context.push('/profile/gift-vault');
+                },
+                variant: ButtonVariant.secondary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: CustomButton(
+                text: 'Offrir une Carte Cadeau',
+                onPressed: () {
+                  context.push('/gifts/store');
+                },
+                variant: ButtonVariant.secondary,
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Junior Account Button
+            SizedBox(
+              width: double.infinity,
+              child: CustomButton(
+                text: 'Finimoi Junior',
+                onPressed: () {
+                  context.push('/profile/junior');
+                },
+                variant: ButtonVariant.secondary,
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Subscriptions Button
+            SizedBox(
+              width: double.infinity,
+              child: CustomButton(
+                text: 'Mes Abonnements',
+                onPressed: () {
+                  context.push('/profile/subscriptions');
+                },
+                variant: ButtonVariant.secondary,
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Rewards Button
+            SizedBox(
+              width: double.infinity,
+              child: CustomButton(
+                text: 'Récompenses',
+                onPressed: () {
+                  context.push('/rewards');
+                },
+                variant: ButtonVariant.secondary,
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Merchant Onboarding Button
+            SizedBox(
+              width: double.infinity,
+              child: CustomButton(
+                text: 'Devenir Marchand',
+                onPressed: () {
+                  context.push('/merchant/onboarding');
+                },
+                variant: ButtonVariant.secondary,
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
             // Logout Button
             SizedBox(
               width: double.infinity,

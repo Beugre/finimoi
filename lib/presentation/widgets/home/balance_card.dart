@@ -136,7 +136,7 @@ class _BalanceCardState extends ConsumerState<BalanceCard> {
                     icon: Icons.request_page,
                     label: 'Demander',
                     onTap: () {
-                      // TODO: Navigate to request money
+                        context.push('/payments/request');
                     },
                   ),
                 ),

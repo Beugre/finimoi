@@ -51,13 +51,19 @@ class RealSavingsService {
   Future<String> createSavings(SavingsModel savings) async {
     try {
       final docRef = await _savingsRef.add(savings.toFirestore());
-
-      // Mettre à jour l'ID avec l'ID du document
       await docRef.update({'id': docRef.id});
-
       return docRef.id;
     } catch (e) {
       throw Exception('Erreur lors de la création de l\'épargne: $e');
+    }
+  }
+
+  // Mettre à jour une épargne
+  Future<void> updateSavings(String savingsId, Map<String, dynamic> data) async {
+    try {
+      await _savingsRef.doc(savingsId).update(data);
+    } catch (e) {
+      throw Exception('Erreur lors de la mise à jour de l\'épargne: $e');
     }
   }
 
@@ -76,44 +82,26 @@ class RealSavingsService {
         final savingsRef = _savingsRef.doc(savingsId);
         final userRef = _firestore.collection('users').doc(userId);
 
-        // Vérifier le solde de l'utilisateur
         final userDoc = await transaction.get(userRef);
-        if (!userDoc.exists) {
-          throw Exception('Utilisateur introuvable');
-        }
-
+        if (!userDoc.exists) throw Exception('Utilisateur introuvable');
         final userData = userDoc.data() as Map<String, dynamic>;
         final userBalance = (userData['balance'] ?? 0.0).toDouble();
+        if (userBalance < amount) throw Exception('Solde insuffisant');
 
-        if (userBalance < amount) {
-          throw Exception('Solde insuffisant');
-        }
-
-        // Obtenir l'épargne actuelle
         final savingsDoc = await transaction.get(savingsRef);
-        if (!savingsDoc.exists) {
-          throw Exception('Épargne introuvable');
-        }
-
+        if (!savingsDoc.exists) throw Exception('Épargne introuvable');
         final savingsData = savingsDoc.data() as Map<String, dynamic>;
         final currentAmount = (savingsData['currentAmount'] ?? 0.0).toDouble();
         final targetAmount = (savingsData['targetAmount'] ?? 0.0).toDouble();
-
         final newAmount = currentAmount + amount;
-        final isCompleted = newAmount >= targetAmount;
 
-        // Mettre à jour le solde de l'utilisateur
         transaction.update(userRef, {'balance': userBalance - amount});
-
-        // Mettre à jour l'épargne
         transaction.update(savingsRef, {
           'currentAmount': newAmount,
-          'isCompleted': isCompleted,
-          'lastContributionAt': Timestamp.now(),
+          'isCompleted': newAmount >= targetAmount,
           'updatedAt': Timestamp.now(),
         });
 
-        // Ajouter l'historique de la contribution
         final contributionRef = savingsRef.collection('contributions').doc();
         transaction.set(contributionRef, {
           'amount': amount,
@@ -130,53 +118,53 @@ class RealSavingsService {
   Future<void> withdrawFromSavings(
     String savingsId,
     String userId,
-    double amount,
-  ) async {
+    double amount, {
+    bool bypassApproval = false,
+  }) async {
     if (amount <= 0) {
       throw Exception('Le montant doit être positif');
     }
 
+    final savingsRef = _savingsRef.doc(savingsId);
+    final savingsDoc = await savingsRef.get();
+    if (!savingsDoc.exists) {
+      throw Exception('Épargne introuvable');
+    }
+    final savings = SavingsModel.fromFirestore(savingsDoc);
+
+    if (savings.approverId != null &&
+        savings.approverId!.isNotEmpty &&
+        !bypassApproval) {
+      await _createWithdrawalRequest(savingsId, userId, amount);
+      return;
+    }
+
     try {
       await _firestore.runTransaction((transaction) async {
-        final savingsRef = _savingsRef.doc(savingsId);
         final userRef = _firestore.collection('users').doc(userId);
 
-        // Obtenir l'épargne actuelle
-        final savingsDoc = await transaction.get(savingsRef);
-        if (!savingsDoc.exists) {
-          throw Exception('Épargne introuvable');
+        if (savings.isLocked && savings.deadline.isAfter(DateTime.now())) {
+          throw Exception('Cette épargne est bloquée jusqu\'à la date d\'échéance.');
         }
 
-        final savingsData = savingsDoc.data() as Map<String, dynamic>;
-        final currentAmount = (savingsData['currentAmount'] ?? 0.0).toDouble();
-
-        if (currentAmount < amount) {
+        if (savings.currentAmount < amount) {
           throw Exception('Montant insuffisant dans l\'épargne');
         }
 
-        final newAmount = currentAmount - amount;
+        final newAmount = savings.currentAmount - amount;
 
-        // Obtenir l'utilisateur
         final userDoc = await transaction.get(userRef);
-        if (!userDoc.exists) {
-          throw Exception('Utilisateur introuvable');
-        }
-
+        if (!userDoc.exists) throw Exception('Utilisateur introuvable');
         final userData = userDoc.data() as Map<String, dynamic>;
         final userBalance = (userData['balance'] ?? 0.0).toDouble();
 
-        // Mettre à jour le solde de l'utilisateur
         transaction.update(userRef, {'balance': userBalance + amount});
-
-        // Mettre à jour l'épargne
         transaction.update(savingsRef, {
           'currentAmount': newAmount,
           'isCompleted': false,
-          'lastWithdrawalAt': Timestamp.now(),
           'updatedAt': Timestamp.now(),
         });
 
-        // Ajouter l'historique du retrait
         final withdrawalRef = savingsRef.collection('withdrawals').doc();
         transaction.set(withdrawalRef, {
           'amount': amount,
@@ -189,131 +177,66 @@ class RealSavingsService {
     }
   }
 
-  // Supprimer une épargne
-  Future<void> deleteSavings(String savingsId, String userId) async {
-    try {
-      await _firestore.runTransaction((transaction) async {
-        final savingsRef = _savingsRef.doc(savingsId);
-
-        // Vérifier que l'épargne appartient à l'utilisateur
-        final savingsDoc = await transaction.get(savingsRef);
-        if (!savingsDoc.exists) {
-          throw Exception('Épargne introuvable');
-        }
-
-        final savingsData = savingsDoc.data() as Map<String, dynamic>;
-        if (savingsData['userId'] != userId) {
-          throw Exception(
-            'Vous n\'êtes pas autorisé à supprimer cette épargne',
-          );
-        }
-
-        final currentAmount = (savingsData['currentAmount'] ?? 0.0).toDouble();
-
-        // Rembourser le montant épargné à l'utilisateur
-        if (currentAmount > 0) {
-          final userRef = _firestore.collection('users').doc(userId);
-          final userDoc = await transaction.get(userRef);
-
-          if (userDoc.exists) {
-            final userData = userDoc.data() as Map<String, dynamic>;
-            final userBalance = (userData['balance'] ?? 0.0).toDouble();
-
-            transaction.update(userRef, {
-              'balance': userBalance + currentAmount,
-            });
-          }
-        }
-
-        // Supprimer l'épargne
-        transaction.delete(savingsRef);
-      });
-    } catch (e) {
-      throw Exception('Erreur lors de la suppression de l\'épargne: $e');
-    }
+  Future<void> _createWithdrawalRequest(
+      String savingsId, String userId, double amount) async {
+    final requestRef =
+        _savingsRef.doc(savingsId).collection('withdrawal_requests').doc();
+    await requestRef.set({
+      'userId': userId,
+      'amount': amount,
+      'status': 'pending',
+      'createdAt': Timestamp.now(),
+    });
   }
 
-  // Obtenir les statistiques d'épargne
-  Future<Map<String, dynamic>> getSavingsStats(String userId) async {
-    try {
-      final snapshot = await _savingsRef
-          .where('userId', isEqualTo: userId)
-          .get();
+  Future<void> approveWithdrawalRequest(
+      String savingsId, String requestId) async {
+    final requestRef =
+        _savingsRef.doc(savingsId).collection('withdrawal_requests').doc(requestId);
+    final requestDoc = await requestRef.get();
+    if (!requestDoc.exists) {
+      throw Exception('Demande de retrait introuvable');
+    }
 
-      double totalSaved = 0;
-      double totalTarget = 0;
-      int activeSavings = 0;
-      int completedSavings = 0;
+    final requestData = requestDoc.data() as Map<String, dynamic>;
+    final userId = requestData['userId'];
+    final amount = requestData['amount'];
 
-      for (final doc in snapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>;
-        final currentAmount = (data['currentAmount'] ?? 0.0).toDouble();
-        final targetAmount = (data['targetAmount'] ?? 0.0).toDouble();
-        final isActive = data['isActive'] ?? true;
-        final isCompleted = data['isCompleted'] ?? false;
+    await withdrawFromSavings(savingsId, userId, amount, bypassApproval: true);
+    await requestRef.update({'status': 'approved'});
+  }
 
-        totalSaved += currentAmount;
-        totalTarget += targetAmount;
+  // Simulated scheduled function to calculate and apply interest
+  Future<void> calculateAndApplyInterest() async {
+    final snapshot = await _savingsRef.where('isCompleted', isEqualTo: false).get();
+    final batch = _firestore.batch();
+    for (final doc in snapshot.docs) {
+      final savings = SavingsModel.fromFirestore(doc);
+      final monthlyRate = savings.interestRate / 12;
+      final interestAmount = savings.currentAmount * monthlyRate;
+      if (interestAmount > 0) {
+        batch.update(doc.reference, {
+          'currentAmount': FieldValue.increment(interestAmount),
+          'updatedAt': Timestamp.now(),
+        });
+      }
+    }
+    await batch.commit();
+  }
 
-        if (isActive) {
-          activeSavings++;
-        }
-        if (isCompleted) {
-          completedSavings++;
+  // Simulated scheduled function to process automatic deposits
+  Future<void> processAutomaticDeposits() async {
+    final snapshot = await _savingsRef.where('autoSave', isEqualTo: true).get();
+    for (final doc in snapshot.docs) {
+      final savings = SavingsModel.fromFirestore(doc);
+      if (savings.autoSaveAmount > 0) {
+        try {
+          await addToSavings(
+              savings.id, savings.userId, savings.autoSaveAmount);
+        } catch (e) {
+          print('Failed to process auto-deposit for ${savings.id}: $e');
         }
       }
-
-      return {
-        'totalSaved': totalSaved,
-        'totalTarget': totalTarget,
-        'activeSavings': activeSavings,
-        'completedSavings': completedSavings,
-        'totalSavings': snapshot.docs.length,
-        'progressPercentage': totalTarget > 0
-            ? (totalSaved / totalTarget) * 100
-            : 0.0,
-      };
-    } catch (e) {
-      return {
-        'totalSaved': 0.0,
-        'totalTarget': 0.0,
-        'activeSavings': 0,
-        'completedSavings': 0,
-        'totalSavings': 0,
-        'progressPercentage': 0.0,
-      };
     }
-  }
-
-  // Obtenir l'historique des contributions
-  Stream<List<Map<String, dynamic>>> getContributionHistory(String savingsId) {
-    return _savingsRef
-        .doc(savingsId)
-        .collection('contributions')
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
-          return snapshot.docs
-              .map(
-                (doc) => {'id': doc.id, ...doc.data() as Map<String, dynamic>},
-              )
-              .toList();
-        });
-  }
-
-  // Obtenir l'historique des retraits
-  Stream<List<Map<String, dynamic>>> getWithdrawalHistory(String savingsId) {
-    return _savingsRef
-        .doc(savingsId)
-        .collection('withdrawals')
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
-          return snapshot.docs
-              .map(
-                (doc) => {'id': doc.id, ...doc.data() as Map<String, dynamic>},
-              )
-              .toList();
-        });
   }
 }

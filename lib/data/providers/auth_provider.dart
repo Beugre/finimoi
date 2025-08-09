@@ -27,12 +27,14 @@ class AuthController {
     required String email,
     required String password,
     required String fullName,
+    String? referralCode,
   }) async {
     try {
       final result = await AuthService.signUpWithEmailPassword(
         email: email,
         password: password,
         fullName: fullName,
+        referralCode: referralCode,
       );
       return result;
     } catch (e) {

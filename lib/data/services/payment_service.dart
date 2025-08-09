@@ -111,6 +111,42 @@ class PaymentTransaction {
       completedAt: completedAt ?? this.completedAt,
     );
   }
+
+  // Simuler un retrait
+  static Future<void> withdraw({
+    required String userId,
+    required double amount,
+    required String method,
+    required String details,
+  }) async {
+    if (amount <= 0) {
+      throw Exception('Le montant doit être positif');
+    }
+
+    try {
+      await _firestore.runTransaction((transaction) async {
+        final userRef = _firestore.collection('users').doc(userId);
+        final userDoc = await transaction.get(userRef);
+
+        if (!userDoc.exists) {
+          throw Exception('Utilisateur non trouvé');
+        }
+
+        final currentBalance = (userDoc.data()?['balance'] ?? 0.0).toDouble();
+        if (currentBalance < amount) {
+          throw Exception('Solde insuffisant');
+        }
+
+        final newBalance = currentBalance - amount;
+        transaction.update(userRef, {'balance': newBalance});
+
+        // In a real app, you would also create a withdrawal record
+        // and interact with a payment provider API.
+      });
+    } catch (e) {
+      throw Exception('Erreur lors du retrait: $e');
+    }
+  }
 }
 
 class PaymentService {

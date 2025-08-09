@@ -154,6 +154,30 @@ class UserService {
     }
   }
 
+  // Get all users
+  static Future<List<UserModel>> getAllUsers() async {
+    try {
+      final querySnapshot = await _usersCollection.get();
+      return querySnapshot.docs
+          .map((doc) => UserModel.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      throw Exception('Erreur lors de la récupération des utilisateurs: $e');
+    }
+  }
+
+  // Save FCM token for push notifications
+  static Future<void> saveFcmToken(String userId, String token) async {
+    try {
+      await _usersCollection.doc(userId).update({
+        'fcmTokens': FieldValue.arrayUnion([token]),
+      });
+    } catch (e) {
+      // Non-critical error, log it but don't throw
+      print('Error saving FCM token: $e');
+    }
+  }
+
   // Add test funds to user balance (temporary method for testing)
   static Future<void> addTestFunds(String userId, double amount) async {
     try {
@@ -174,5 +198,46 @@ class UserService {
     } catch (e) {
       throw Exception('Erreur lors de l\'ajout des fonds: $e');
     }
+  }
+
+  // --- Finimoi Junior ---
+  static Future<String> createJuniorAccount({
+    required String parentAccountId,
+    required String firstName,
+    required String lastName,
+  }) async {
+    try {
+      // Junior accounts don't have their own email/auth for this simplified version.
+      // The parent's email could be used or a placeholder.
+      final parentData = await getUserProfile(parentAccountId);
+      if (parentData == null) throw Exception('Parent account not found');
+
+      final juniorUserModel = UserModel(
+        id: '', // Firestore will generate
+        email: 'junior.${firstName.toLowerCase()}.${lastName.toLowerCase()}@finimoi.app', // Placeholder email
+        firstName: firstName,
+        lastName: lastName,
+        balance: 0.0,
+        createdAt: DateTime.now(),
+        lastLoginAt: DateTime.now(),
+        isEmailVerified: false,
+        isPhoneVerified: false,
+        isJuniorAccount: true,
+        parentAccountId: parentAccountId,
+      );
+
+      final docRef = await _usersCollection.add(juniorUserModel.toFirestore());
+      return docRef.id;
+    } catch (e) {
+      throw Exception('Erreur lors de la création du compte junior: $e');
+    }
+  }
+
+  static Stream<List<UserModel>> getJuniorAccounts(String parentAccountId) {
+    return _usersCollection
+        .where('parentAccountId', isEqualTo: parentAccountId)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => UserModel.fromFirestore(doc)).toList());
   }
 }

@@ -9,6 +9,7 @@ class UserModel {
   final String? profileImageUrl;
   final String? finimoiTag;
   final double balance;
+  final double cashbackBalance;
   final DateTime createdAt;
   final DateTime lastLoginAt;
   final bool isEmailVerified;
@@ -17,6 +18,15 @@ class UserModel {
   final String? city;
   final String? country;
   final DateTime? updatedAt;
+  final bool roundUpSavingsEnabled;
+  final String? roundUpSavingsGoalId;
+  final String? referralCode;
+  final String? referredBy;
+  final bool isJuniorAccount;
+  final String? parentAccountId;
+  final List<String>? homeScreenLayout;
+  final String? gender;
+  final DateTime? dateOfBirth;
 
   UserModel({
     required this.id,
@@ -27,6 +37,7 @@ class UserModel {
     this.profileImageUrl,
     this.finimoiTag,
     required this.balance,
+    this.cashbackBalance = 0.0,
     required this.createdAt,
     required this.lastLoginAt,
     required this.isEmailVerified,
@@ -35,6 +46,15 @@ class UserModel {
     this.city,
     this.country,
     this.updatedAt,
+    this.roundUpSavingsEnabled = false,
+    this.roundUpSavingsGoalId,
+    this.referralCode,
+    this.referredBy,
+    this.isJuniorAccount = false,
+    this.parentAccountId,
+    this.homeScreenLayout,
+    this.gender,
+    this.dateOfBirth,
   });
 
   String get fullName => '$firstName $lastName';
@@ -56,6 +76,7 @@ class UserModel {
       profileImageUrl: data['profileImageUrl'],
       finimoiTag: data['finimoiTag'],
       balance: (data['balance'] ?? 0.0).toDouble(),
+      cashbackBalance: (data['cashbackBalance'] ?? 0.0).toDouble(),
       createdAt: data['createdAt'] != null
           ? (data['createdAt'] is Timestamp
                 ? (data['createdAt'] as Timestamp).toDate()
@@ -72,10 +93,17 @@ class UserModel {
       city: data['city'],
       country: data['country'],
       updatedAt: data['updatedAt'] != null
-          ? (data['updatedAt'] is Timestamp
-                ? (data['updatedAt'] as Timestamp).toDate()
-                : null)
+          ? (data['updatedAt'] as Timestamp).toDate()
           : null,
+      roundUpSavingsEnabled: data['roundUpSavingsEnabled'] ?? false,
+      roundUpSavingsGoalId: data['roundUpSavingsGoalId'],
+      referralCode: data['referralCode'],
+      referredBy: data['referredBy'],
+      isJuniorAccount: data['isJuniorAccount'] ?? false,
+      parentAccountId: data['parentAccountId'],
+      homeScreenLayout: List<String>.from(data['homeScreenLayout'] ?? []),
+      gender: data['gender'],
+      dateOfBirth: data['dateOfBirth'] != null ? (data['dateOfBirth'] as Timestamp).toDate() : null,
     );
   }
 
@@ -88,6 +116,7 @@ class UserModel {
       'profileImageUrl': profileImageUrl,
       'finimoiTag': finimoiTag,
       'balance': balance,
+      'cashbackBalance': cashbackBalance,
       'createdAt': Timestamp.fromDate(createdAt),
       'lastLoginAt': Timestamp.fromDate(lastLoginAt),
       'isEmailVerified': isEmailVerified,
@@ -96,6 +125,15 @@ class UserModel {
       'city': city,
       'country': country,
       'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
+      'roundUpSavingsEnabled': roundUpSavingsEnabled,
+      'roundUpSavingsGoalId': roundUpSavingsGoalId,
+      'referralCode': referralCode,
+      'referredBy': referredBy,
+      'isJuniorAccount': isJuniorAccount,
+      'parentAccountId': parentAccountId,
+      'homeScreenLayout': homeScreenLayout,
+      'gender': gender,
+      'dateOfBirth': dateOfBirth != null ? Timestamp.fromDate(dateOfBirth!) : null,
     };
   }
 
@@ -108,6 +146,7 @@ class UserModel {
     String? profileImageUrl,
     String? finimoiTag,
     double? balance,
+    double? cashbackBalance,
     DateTime? createdAt,
     DateTime? lastLoginAt,
     bool? isEmailVerified,
@@ -116,6 +155,15 @@ class UserModel {
     String? city,
     String? country,
     DateTime? updatedAt,
+    bool? roundUpSavingsEnabled,
+    String? roundUpSavingsGoalId,
+    String? referralCode,
+    String? referredBy,
+    bool? isJuniorAccount,
+    String? parentAccountId,
+    List<String>? homeScreenLayout,
+    String? gender,
+    DateTime? dateOfBirth,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -126,6 +174,7 @@ class UserModel {
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       finimoiTag: finimoiTag ?? this.finimoiTag,
       balance: balance ?? this.balance,
+      cashbackBalance: cashbackBalance ?? this.cashbackBalance,
       createdAt: createdAt ?? this.createdAt,
       lastLoginAt: lastLoginAt ?? this.lastLoginAt,
       isEmailVerified: isEmailVerified ?? this.isEmailVerified,
@@ -134,6 +183,15 @@ class UserModel {
       city: city ?? this.city,
       country: country ?? this.country,
       updatedAt: updatedAt ?? this.updatedAt,
+      roundUpSavingsEnabled: roundUpSavingsEnabled ?? this.roundUpSavingsEnabled,
+      roundUpSavingsGoalId: roundUpSavingsGoalId ?? this.roundUpSavingsGoalId,
+      referralCode: referralCode ?? this.referralCode,
+      referredBy: referredBy ?? this.referredBy,
+      isJuniorAccount: isJuniorAccount ?? this.isJuniorAccount,
+      parentAccountId: parentAccountId ?? this.parentAccountId,
+      homeScreenLayout: homeScreenLayout ?? this.homeScreenLayout,
+      gender: gender ?? this.gender,
+      dateOfBirth: dateOfBirth ?? this.dateOfBirth,
     );
   }
 }

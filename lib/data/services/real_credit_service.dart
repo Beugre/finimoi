@@ -1,6 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/credit_model.dart';
+import '../../domain/entities/user_model.dart';
+import 'transfer_service.dart';
+import 'user_service.dart';
+import 'notification_service.dart';
+import 'real_tontine_service.dart';
+import 'real_savings_service.dart';
 
 final realCreditServiceProvider = Provider<RealCreditService>((ref) {
   return RealCreditService();
@@ -47,6 +53,37 @@ class RealCreditService {
     });
   }
 
+  // Calculer le score de crédit
+  Future<int> calculateCreditScore(String userId) async {
+    int score = 0;
+
+    // Account age
+    final user = await UserService.getUserProfile(userId);
+    if (user != null) {
+      final accountAgeInMonths = DateTime.now().difference(user.createdAt).inDays ~/ 30;
+      score += accountAgeInMonths * 10;
+    }
+
+    // Transaction volume
+    final transactions = await TransferService().getUserTransfers(userId).first;
+    score += transactions.length;
+
+    // Tontine activity
+    final tontines = await RealTontineService().getUserTontines(userId).first;
+    score += tontines.where((t) => t.status == TontineStatus.active).length * 20;
+    score += tontines.where((t) => t.status == TontineStatus.completed).length * 50;
+
+    // Savings history
+    final savingsStats = await RealSavingsService().getSavingsStats(userId);
+    score += (savingsStats['totalSaved'] ?? 0) ~/ 1000; // 1 point per 1000 saved
+
+    // Credit history
+    final credits = await getUserCredits(userId).first;
+    score += credits.where((c) => c.status == 'completed').length * 100; // Bonus for completed credits
+
+    return score;
+  }
+
   // Demander un crédit
   Future<String> requestCredit({
     required String userId,
@@ -55,6 +92,21 @@ class RealCreditService {
     required int duration,
     double interestRate = 0.15, // 15% par défaut
   }) async {
+    final creditScore = await calculateCreditScore(userId);
+
+    // Auto-approve small loans for users with good score
+    if (creditScore > 50 && amount <= 50000) {
+      // Create and approve the credit in one go
+      final creditId = await _createAndApproveCredit(
+        userId: userId,
+        amount: amount,
+        purpose: purpose,
+        duration: duration,
+        interestRate: interestRate,
+      );
+      return creditId;
+    }
+
     if (amount <= 0) {
       throw Exception('Le montant doit être positif');
     }
@@ -134,6 +186,15 @@ class RealCreditService {
           transaction.update(userRef, {'balance': currentBalance + amount});
         }
       });
+
+      // Send notification to user
+      await NotificationService().createNotification(
+        userId: userId,
+        title: 'Crédit Approuvé',
+        message: 'Votre demande de crédit de $amount FCFA a été approuvée!',
+        type: 'credit_approved',
+        data: {'creditId': creditId},
+      );
     } catch (e) {
       throw Exception('Erreur lors de l\'approbation du crédit: $e');
     }
@@ -299,5 +360,99 @@ class RealCreditService {
               .map((doc) => {'id': doc.id, ...doc.data()})
               .toList();
         });
+  }
+
+  Future<String> _createAndApproveCredit({
+    required String userId,
+    required double amount,
+    required String purpose,
+    required int duration,
+    double interestRate = 0.15,
+  }) async {
+    try {
+      final totalAmount = amount + (amount * interestRate);
+      final monthlyPayment = totalAmount / duration;
+      final creditId = _creditsRef.doc().id;
+
+      await _firestore.runTransaction((transaction) async {
+        final creditRef = _creditsRef.doc(creditId);
+        final userRef = _firestore.collection('users').doc(userId);
+
+        final credit = CreditModel(
+          id: creditId,
+          userId: userId,
+          amount: amount,
+          purpose: purpose,
+          duration: duration,
+          interestRate: interestRate,
+          status: 'approved',
+          monthlyPayment: monthlyPayment,
+          remainingAmount: totalAmount,
+          applicationDate: DateTime.now(),
+          approvalDate: DateTime.now(),
+          nextPaymentDate: DateTime.now().add(const Duration(days: 30)),
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+
+        transaction.set(creditRef, credit.toFirestore());
+
+        transaction.update(userRef, {'balance': FieldValue.increment(amount)});
+      });
+
+      return creditId;
+    } catch (e) {
+      throw Exception('Erreur lors de la création et approbation du crédit: $e');
+    }
+  }
+
+  // Simulated scheduled function to send credit reminders
+  Future<void> sendCreditReminders() async {
+    final notificationService = NotificationService();
+    final now = DateTime.now();
+
+    final snapshot = await _creditsRef
+        .where('status', isEqualTo: 'approved')
+        .get();
+
+    for (final doc in snapshot.docs) {
+      final credit = CreditModel.fromFirestore(doc);
+      if (credit.nextPaymentDate != null) {
+        final dueDate = credit.nextPaymentDate!;
+        if (dueDate.isAfter(now) && dueDate.difference(now).inDays <= 3) {
+          await notificationService.createNotification(
+            userId: credit.userId,
+            title: 'Rappel de Paiement de Crédit',
+            message:
+                'Votre paiement de ${credit.monthlyPayment.toInt()} FCFA pour votre crédit "${credit.purpose}" est bientôt dû!',
+            type: 'credit_reminder',
+            data: {'creditId': credit.id},
+          );
+        }
+      }
+    }
+  }
+
+  // Générer le calendrier de remboursement
+  List<RepaymentSchedule> generateRepaymentSchedule(CreditModel credit) {
+    final schedule = <RepaymentSchedule>[];
+    double remainingBalance = credit.totalAmount;
+    final monthlyInterestRate = credit.interestRate / 12;
+
+    for (int i = 1; i <= credit.duration; i++) {
+      final interest = remainingBalance * monthlyInterestRate;
+      final principal = credit.monthlyPayment - interest;
+      remainingBalance -= principal;
+
+      schedule.add(RepaymentSchedule(
+        month: i,
+        dueDate: DateTime(credit.applicationDate.year, credit.applicationDate.month + i, credit.applicationDate.day),
+        principal: principal,
+        interest: interest,
+        totalPayment: credit.monthlyPayment,
+        remainingBalance: remainingBalance > 0 ? remainingBalance : 0,
+      ));
+    }
+    return schedule;
   }
 }

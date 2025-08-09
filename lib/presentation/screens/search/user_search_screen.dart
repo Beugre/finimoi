@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/services/user_search_service.dart';
 import '../../../domain/entities/user_model.dart';
+import '../../../data/providers/auth_provider.dart';
 
 class UserSearchScreen extends ConsumerStatefulWidget {
   final Function(UserModel user) onUserSelected;
@@ -43,12 +44,12 @@ class _UserSearchScreenState extends ConsumerState<UserSearchScreen> {
   }
 
   void _loadRecentContacts() async {
-    // TODO: Get current user ID from provider
+    final userId = ref.read(currentUserProvider)?.uid;
+    if (userId == null) return;
+
     final userSearchService = ref.read(userSearchServiceProvider);
     try {
-      final contacts = await userSearchService.getRecentContacts(
-        'current_user_id',
-      );
+      final contacts = await userSearchService.getRecentContacts(userId);
       setState(() {
         _recentContacts = contacts;
       });

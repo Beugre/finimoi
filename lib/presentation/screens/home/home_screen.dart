@@ -86,35 +86,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Welcome message
-                  _buildWelcomeMessage(),
-
-                  const SizedBox(height: 24),
-
-                  // Balance Card
-                  const BalanceCard(),
-
-                  const SizedBox(height: 24),
-
-                  // Quick Actions
-                  const QuickActions(),
-
-                  const SizedBox(height: 32),
-
-                  // Recent Transactions
-                  const RecentTransactions(),
-
-                  const SizedBox(height: 24),
-
-                  // Promotional Banner
-                  _buildPromotionalBanner(),
-
-                  const SizedBox(height: 100), // Space for bottom navigation
-                ],
-              ),
+              child: _buildDynamicLayout(),
             ),
           ),
         ),
@@ -446,6 +418,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildDynamicLayout() {
+    final user = ref.watch(userProfileProvider).value;
+    final layout = user?.homeScreenLayout ?? ['welcome', 'balance', 'actions', 'transactions', 'promo'];
+
+    final Map<String, Widget> widgetMap = {
+      'welcome': _buildWelcomeMessage(),
+      'balance': const BalanceCard(),
+      'actions': const QuickActions(),
+      'transactions': const RecentTransactions(),
+      'promo': _buildPromotionalBanner(),
+    };
+
+    final Map<String, double> spacingMap = {
+      'welcome': 24,
+      'balance': 24,
+      'actions': 32,
+      'transactions': 24,
+      'promo': 100,
+    };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: layout.map((key) {
+        final widget = widgetMap[key];
+        if (widget == null) return const SizedBox.shrink();
+        return Column(
+          children: [
+            widget,
+            SizedBox(height: spacingMap[key] ?? 24),
+          ],
+        );
+      }).toList(),
     );
   }
 }
