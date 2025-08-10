@@ -74,8 +74,8 @@ dependencies:
   local_auth: ^2.3.0
 
   # Payments & Finance
-  stripe_flutter: ^10.0.0
-  # flutter_paystack: ^1.0.7  # À configurer plus tard
+  pay: ^2.0.0
+  flutter_stripe: ^10.1.1
 
   # Camera & Image
   image_picker: ^1.1.2
@@ -88,7 +88,7 @@ dependencies:
   google_maps_flutter: ^2.9.0
 
   # Utils
-  intl: ^0.19.0
+  intl: ^0.20.2
   timeago: ^3.6.1
   path_provider: ^2.1.4
   url_launcher: ^6.3.1

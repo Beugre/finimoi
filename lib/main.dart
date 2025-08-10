@@ -3,10 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
+import 'core/config/stripe_config.dart';
 import 'data/services/preferences_service.dart';
 import 'data/services/deep_link_service.dart';
 import 'data/providers/notification_provider.dart';
@@ -22,6 +24,14 @@ void main() async {
   } catch (e) {
     // Firebase initialization failed, but app can still run without it
     print('Firebase initialization failed: $e');
+  }
+
+  // Initialize Stripe
+  try {
+    Stripe.publishableKey = StripeConfig.publishableKey;
+    await Stripe.instance.applySettings();
+  } catch (e) {
+    print('Stripe initialization failed: $e');
   }
 
   // Initialize SharedPreferences
